@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: 12345
-      POSTGRES_DB: shortener
+      POSTGRES_DB: shortener_db
     ports:
       - "3001:5432"
     volumes:
