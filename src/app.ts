@@ -1,8 +1,7 @@
 import express, { Application } from 'express'
+import router from './routes'
 
 export const app: Application = express()
 
-app.get('/', (req, res) => {
-  console.log('Request received')
-  res.send('Hello World!')
-})
+app.use(express.json())
+app.use('/api', router)
