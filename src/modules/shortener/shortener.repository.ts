@@ -1,36 +1,41 @@
+import { Prisma, Url } from '../../../prisma/generated/client'
 import { prisma } from '../../config/database'
+import { ConflictError, DatabaseError } from '../../shared/errors'
 import { CreateShortUrlData } from './shortener.type'
 
+function throwRepositoryError(error: unknown): never {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  ) {
+    throw new ConflictError(
+      'SHORT_URL_ALREADY_EXISTS',
+      'A short URL with this code already exists',
+      error,
+    )
+  }
+
+  throw new DatabaseError(error)
+}
+
 const shortenerRepository = {
-  async createShortUrl(shortUrlData: CreateShortUrlData) {
+  async createShortUrl(shortUrlData: CreateShortUrlData): Promise<Url> {
     try {
-      const data = await prisma.url.create({
+      return await prisma.url.create({
         data: shortUrlData,
       })
-
-      return data
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new Error(error.message)
-      }
-
-      throw new Error('Failed to create short URL in the database')
+      throwRepositoryError(error)
     }
   },
 
-  async findShortUrl(shortCode: string) {
+  async findShortUrl(shortCode: string): Promise<Url | null> {
     try {
-      const data = await prisma.url.findUnique({
+      return await prisma.url.findUnique({
         where: { shortCode },
       })
-
-      return data
     } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new Error(error.message)
-      }
-
-      throw new Error('Failed to find short URL in the database')
+      throwRepositoryError(error)
     }
   },
 }
