@@ -1,7 +1,10 @@
 import { Prisma, Url } from '../../../prisma/generated/client'
 import { prisma } from '../../config/database'
 import { ConflictError, DatabaseError } from '../../shared/errors'
-import { CreateShortUrlData } from './shortener.type'
+import {
+  ClickIncrement,
+  CreateShortUrlData,
+} from './shortener.type'
 
 function throwRepositoryError(error: unknown): never {
   if (
@@ -34,6 +37,38 @@ const shortenerRepository = {
       return await prisma.url.findUnique({
         where: { shortCode },
       })
+    } catch (error: unknown) {
+      throwRepositoryError(error)
+    }
+  },
+
+  async incrementClicks(shortCode: string): Promise<void> {
+    try {
+      await prisma.url.update({
+        where: { shortCode },
+        data: { clicks: { increment: 1 } },
+      })
+    } catch (error: unknown) {
+      throwRepositoryError(error)
+    }
+  },
+
+  async incrementClicksBatch(
+    increments: ClickIncrement[],
+  ): Promise<void> {
+    if (increments.length === 0) {
+      return
+    }
+
+    try {
+      const updates = increments.map(({ shortCode, count }) =>
+        prisma.url.update({
+          where: { shortCode },
+          data: { clicks: { increment: count } },
+        }),
+      )
+
+      await prisma.$transaction(updates)
     } catch (error: unknown) {
       throwRepositoryError(error)
     }

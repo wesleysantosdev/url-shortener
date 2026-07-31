@@ -44,6 +44,17 @@ describe('HTTP application errors', () => {
     expect(error.detail).toBe('Route POST /missing not found')
   })
 
+  it('creates a resource not found error with a specific code', () => {
+    const error = new NotFoundError(
+      'Short URL not found',
+      'SHORT_URL_NOT_FOUND',
+    )
+
+    expect(error.statusCode).toBe(404)
+    expect(error.code).toBe('SHORT_URL_NOT_FOUND')
+    expect(error.detail).toBe('Short URL not found')
+  })
+
   it('marks database errors as unexpected and preserves their cause', () => {
     const cause = new Error('connection refused')
     const error = new DatabaseError(cause)

@@ -6,7 +6,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsx watch src/server.ts",
+    "dev:baseline": "CACHE_ENABLED=false CLICK_TRACKING_MODE=sync tsx watch src/server.ts",
+    "dev:optimized": "CACHE_ENABLED=true CLICK_TRACKING_MODE=async tsx watch src/server.ts",
+    "worker": "tsx watch src/worker.ts",
+    "benchmark": "tsx scripts/benchmark.ts",
     "start": "node dist/src/server.js",
+    "start:worker": "node dist/src/worker.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -25,13 +30,16 @@
     "argon2id": "^1.0.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "ioredis": "^5.11.1",
     "prisma": "^7.9.0",
     "typescript": "^7.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/autocannon": "^7.12.7",
     "@types/express": "^5.0.6",
     "@types/supertest": "^7.2.1",
+    "autocannon": "^8.0.0",
     "supertest": "^7.2.2",
     "tsx": "^4.23.1",
     "vitest": "^4.1.10"

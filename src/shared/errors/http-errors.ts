@@ -25,10 +25,10 @@ export class ConflictError extends AppError {
 }
 
 export class NotFoundError extends AppError {
-  constructor(detail: string) {
+  constructor(detail: string, code = 'ROUTE_NOT_FOUND') {
     super({
       statusCode: 404,
-      code: 'ROUTE_NOT_FOUND',
+      code,
       title: 'Not Found',
       detail,
     })
@@ -41,7 +41,7 @@ export class DatabaseError extends AppError {
       statusCode: 500,
       code: 'INTERNAL_SERVER_ERROR',
       title: 'Internal Server Error',
-      detail: 'An unexpected error occurred, check server log for details',
+      detail: 'An unexpected error occurred',
       isOperational: false,
       cause,
     })

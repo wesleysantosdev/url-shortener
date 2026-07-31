@@ -1,12 +1,17 @@
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { NotFoundError } from '../../shared/errors'
 import { originalUrl, urlFixture } from '../helpers/url.fixture'
 
-const createShortUrlMock = vi.hoisted(() => vi.fn())
+const { createShortUrlMock, resolveShortUrlMock } = vi.hoisted(() => ({
+  createShortUrlMock: vi.fn(),
+  resolveShortUrlMock: vi.fn(),
+}))
 
 vi.mock('../../modules/shortener/shortener.service', () => ({
   default: {
     createShortUrl: createShortUrlMock,
+    resolveShortUrl: resolveShortUrlMock,
   },
 }))
 
@@ -71,5 +76,59 @@ describe('POST /api/v1/shortener', () => {
       errors: [expect.objectContaining({ path })],
     })
     expect(createShortUrlMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /:shortCode', () => {
+  beforeEach(() => {
+    resolveShortUrlMock.mockResolvedValue(originalUrl)
+  })
+
+  it('redirects to the original URL without allowing response caching', async () => {
+    const response = await request(app).get(`/${urlFixture.shortCode}`)
+
+    expect(response.status).toBe(302)
+    expect(response.headers.location).toBe(originalUrl)
+    expect(response.headers['cache-control']).toBe('no-store')
+    expect(resolveShortUrlMock).toHaveBeenCalledWith(urlFixture.shortCode)
+  })
+
+  it('returns Problem Details when the short code does not exist', async () => {
+    resolveShortUrlMock.mockRejectedValue(
+      new NotFoundError('Short URL not found', 'SHORT_URL_NOT_FOUND'),
+    )
+
+    const response = await request(app).get(`/${urlFixture.shortCode}`)
+
+    expect(response.status).toBe(404)
+    expect(response.headers['content-type']).toMatch(
+      /^application\/problem\+json/,
+    )
+    expect(response.body).toMatchObject({
+      status: 404,
+      detail: 'Short URL not found',
+      instance: `/${urlFixture.shortCode}`,
+      code: 'SHORT_URL_NOT_FOUND',
+    })
+  })
+
+  it('returns not found without querying services for an invalid code', async () => {
+    const response = await request(app).get('/not-a-short-code')
+
+    expect(response.status).toBe(404)
+    expect(response.body).toMatchObject({
+      code: 'SHORT_URL_NOT_FOUND',
+      detail: 'Short URL not found',
+    })
+    expect(resolveShortUrlMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps redirecting legacy eight-character codes', async () => {
+    const legacyShortCode = '100680ad'
+
+    const response = await request(app).get(`/${legacyShortCode}`)
+
+    expect(response.status).toBe(302)
+    expect(resolveShortUrlMock).toHaveBeenCalledWith(legacyShortCode)
   })
 })

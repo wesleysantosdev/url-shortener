@@ -13,9 +13,25 @@ services:
       - shortener-network
   redis:
     image: redis:7-alpine
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - volatile-lru
     ports:
       - "6379:6379"
-
+    volumes:
+      - shortener-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - shortener-network
   # shortener-app:
@@ -29,5 +45,6 @@ services:
   #     - shortener-network
 volumes:
   shortener-db-data:
+  shortener-redis-data:
 networks:
   shortener-network:

@@ -10,7 +10,9 @@ const prismaMock = vi.hoisted(() => ({
   url: {
     create: vi.fn(),
     findUnique: vi.fn(),
+    update: vi.fn(),
   },
+  $transaction: vi.fn(),
 }))
 
 vi.mock('../../config/database', () => ({
@@ -23,6 +25,8 @@ describe('shortenerRepository', () => {
   beforeEach(() => {
     prismaMock.url.create.mockResolvedValue(urlFixture)
     prismaMock.url.findUnique.mockResolvedValue(urlFixture)
+    prismaMock.url.update.mockResolvedValue(urlFixture)
+    prismaMock.$transaction.mockResolvedValue([])
   })
 
   it('returns the created URL', async () => {
@@ -75,5 +79,42 @@ describe('shortenerRepository', () => {
       code: 'INTERNAL_SERVER_ERROR',
       cause,
     })
+  })
+
+  it('increments one click synchronously for the benchmark baseline', async () => {
+    await shortenerRepository.incrementClicks(shortCode)
+
+    expect(prismaMock.url.update).toHaveBeenCalledWith({
+      where: { shortCode },
+      data: { clicks: { increment: 1 } },
+    })
+  })
+
+  it('increments grouped click counts in one Prisma transaction', async () => {
+    const increments = [
+      { shortCode, count: 3 },
+      { shortCode: 'abcdef0123456789', count: 2 },
+    ]
+
+    await shortenerRepository.incrementClicksBatch(increments)
+
+    expect(prismaMock.url.update).toHaveBeenNthCalledWith(1, {
+      where: { shortCode },
+      data: { clicks: { increment: 3 } },
+    })
+    expect(prismaMock.url.update).toHaveBeenNthCalledWith(2, {
+      where: { shortCode: 'abcdef0123456789' },
+      data: { clicks: { increment: 2 } },
+    })
+    expect(prismaMock.$transaction).toHaveBeenCalledWith([
+      prismaMock.url.update.mock.results[0].value,
+      prismaMock.url.update.mock.results[1].value,
+    ])
+  })
+
+  it('does not open a transaction for an empty batch', async () => {
+    await shortenerRepository.incrementClicksBatch([])
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled()
   })
 })

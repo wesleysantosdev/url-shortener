@@ -1,7 +1,7 @@
 import { Url } from '../../../prisma/generated/client'
 
 export const originalUrl = 'https://example.com'
-export const shortCode = '100680ad'
+export const shortCode = '100680ad546ce6a5'
 
 export const urlFixture: Url = {
   id: 'cm123',

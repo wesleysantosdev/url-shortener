@@ -1,5 +1,9 @@
 import { Request, Response } from 'express'
-import { CreateShortUrlBody } from './shortener.schema'
+import { NotFoundError } from '../../shared/errors'
+import {
+  CreateShortUrlBody,
+  shortCodeSchema,
+} from './shortener.schema'
 import shortenerService from './shortener.service'
 
 const shortenerController = {
@@ -14,6 +18,25 @@ const shortenerController = {
       message: 'Short URL created successfully',
       data,
     })
+  },
+
+  async redirectToOriginalUrl(
+    request: Request<{ shortCode: string }>,
+    response: Response,
+  ): Promise<void> {
+    if (!shortCodeSchema.safeParse(request.params.shortCode).success) {
+      throw new NotFoundError(
+        'Short URL not found',
+        'SHORT_URL_NOT_FOUND',
+      )
+    }
+
+    const originalUrl = await shortenerService.resolveShortUrl(
+      request.params.shortCode,
+    )
+
+    response.set('Cache-Control', 'no-store')
+    response.redirect(302, originalUrl)
   },
 }
 
