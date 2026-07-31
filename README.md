@@ -12,12 +12,26 @@ O projeto oferece:
 - modo baseline sem cache/fila para comparação de performance;
 - benchmark HTTP com Autocannon.
 
+Guias disponíveis:
+
+- [System Design e TypeScript](./SYSTEM_DESIGN_STUDY.md)
+- [Docker, imagem e serviços](./DOCKER_GUIDE.md)
+- [Benchmark detalhado, com e sem otimizações](./PERFORMANCE_TEST_GUIDE.md)
+
 ## Preparação
+
+### Tudo dentro do Docker
+
+```bash
+docker compose --profile app up -d --build
+```
+
+### Node local e somente infraestrutura no Docker
 
 ```bash
 cp .env.example .env
-docker compose up -d
 npm install
+docker compose up -d
 npx prisma generate
 npx prisma migrate deploy
 ```

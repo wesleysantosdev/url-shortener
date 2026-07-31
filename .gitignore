@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 coverage/
+benchmark-results/
 
 # Runtime data and logs
 *.log
@@ -45,3 +46,4 @@ Thumbs.db
 ERROR_HANDLING.md
 INTERVIEW_SIMULATION.md
 SYSTEM_DESIGN_STUDY.md
+DOCKER_GUIDE.md

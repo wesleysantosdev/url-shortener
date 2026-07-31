@@ -1,0 +1,14 @@
+.git
+.agents
+.codex
+.env
+.env.*
+!.env.example
+node_modules
+dist
+coverage
+benchmark-results
+*.log
+*.md
+src/**/*.test.ts
+src/tests
