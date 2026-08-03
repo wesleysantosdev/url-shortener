@@ -1,0 +1,70 @@
+.pageShell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100svh;
+  overflow-x: clip;
+}
+
+.header,
+.footer {
+  position: relative;
+  z-index: 10;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(100% - 3rem, 76rem);
+  margin-inline: auto;
+  padding-block: 1.5rem;
+}
+
+.brand {
+  color: var(--graphite-ink);
+  font-size: 0.76rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.socialLinks {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.main {
+  display: grid;
+}
+
+.footer {
+  padding: 1.35rem 1.5rem 1.6rem;
+  color: #6d6575;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.footer a {
+  color: var(--graphite-ink);
+  font-weight: 700;
+  text-decoration-color: var(--circuit-violet);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22rem;
+}
+
+.footerArrow {
+  display: inline-block;
+  margin-left: 0.2rem;
+  color: var(--circuit-violet);
+}
+
+@media (max-width: 37.5rem) {
+  .navigation {
+    width: calc(100% - 2rem);
+    padding-block: 1rem;
+  }
+
+  .footer {
+    padding-block: 1rem 1.25rem;
+  }
+}

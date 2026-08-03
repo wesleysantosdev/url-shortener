@@ -7,6 +7,7 @@ x-app-environment: &app-environment
   CLICK_BATCH_SIZE: ${CLICK_BATCH_SIZE:-500}
   CLICK_BATCH_INTERVAL_MS: ${CLICK_BATCH_INTERVAL_MS:-5000}
   CLICK_QUEUE_MAX_LENGTH: ${CLICK_QUEUE_MAX_LENGTH:-1000000}
+  CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN in backend/.env}
 
 x-runtime-service: &runtime-service
   image: url-shortener-app:local

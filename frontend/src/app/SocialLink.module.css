@@ -1,0 +1,32 @@
+.socialLink {
+  display: grid;
+  width: 2.55rem;
+  height: 2.55rem;
+  place-items: center;
+  color: var(--graphite-ink);
+  background: rgb(255 255 255 / 72%);
+  border: 1px solid #dcd5e3;
+  border-radius: 999px;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.socialLink:hover {
+  color: var(--deep-violet);
+  border-color: var(--circuit-violet);
+  transform: translateY(-2px);
+}
+
+.socialLink svg {
+  width: 1.08rem;
+  height: 1.08rem;
+  fill: currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .socialLink {
+    transition: none;
+  }
+}

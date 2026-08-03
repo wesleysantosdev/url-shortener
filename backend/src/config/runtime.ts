@@ -1,3 +1,5 @@
+import 'dotenv/config'
+
 export interface RuntimeConfig {
   redisUrl: string
   redisCommandTimeoutMs: number
@@ -8,6 +10,41 @@ export interface RuntimeConfig {
   clickBatchSize: number
   clickBatchIntervalMs: number
   clickQueueMaxLength: number
+  corsAllowedOrigin: string
+}
+
+function httpOrigin(
+  env: NodeJS.ProcessEnv,
+  name: string,
+): string {
+  const rawValue = env[name]
+
+  if (rawValue === undefined || rawValue.trim() === '') {
+    throw new Error(
+      `Invalid ${name} ${JSON.stringify(rawValue)}: expected a required HTTP or HTTPS origin`,
+    )
+  }
+
+  try {
+    const url = new URL(rawValue)
+    const hasHttpProtocol = url.protocol === 'http:' || url.protocol === 'https:'
+    const hasOnlyOrigin =
+      url.pathname === '/' &&
+      url.search === '' &&
+      url.hash === '' &&
+      url.username === '' &&
+      url.password === ''
+
+    if (!hasHttpProtocol || !hasOnlyOrigin) {
+      throw new Error('invalid origin')
+    }
+
+    return url.origin
+  } catch {
+    throw new Error(
+      `Invalid ${name} ${JSON.stringify(rawValue)}: expected an HTTP or HTTPS origin`,
+    )
+  }
 }
 
 function positiveInteger(
@@ -98,6 +135,10 @@ export function loadRuntimeConfig(
       env,
       'CLICK_QUEUE_MAX_LENGTH',
       1_000_000,
+    ),
+    corsAllowedOrigin: httpOrigin(
+      env,
+      'CORS_ALLOWED_ORIGIN',
     ),
   }
 }

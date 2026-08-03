@@ -1,49 +1,58 @@
-# URL Shortener
+# URL Shortener Backend
 
-API didática de encurtamento de URLs construída com Node.js, Express,
-TypeScript, Prisma, PostgreSQL e Redis.
+Node.js and Express API for shortening URLs, built with TypeScript, Prisma,
+PostgreSQL, and Redis.
 
-O projeto oferece:
+The API supports URL creation through `POST /api/v1/shortener`, public redirects
+through `GET /:shortCode`, Redis cache-aside reads, asynchronous click tracking
+with a Redis List and batch worker, a baseline mode without caching or queuing,
+and HTTP benchmarking with Autocannon.
 
-- criação por `POST /api/v1/shortener`;
-- redirecionamento público por `GET /:shortCode`;
-- cache-aside Redis para leituras rápidas;
-- contagem assíncrona de cliques com Redis List e worker em batch;
-- modo baseline sem cache/fila para comparação de performance;
-- benchmark HTTP com Autocannon.
+## Local setup
 
-Guias disponíveis:
-
-- [System Design e TypeScript](./SYSTEM_DESIGN_STUDY.md)
-- [Docker, imagem e serviços](./DOCKER_GUIDE.md)
-- [Benchmark detalhado, com e sem otimizações](./PERFORMANCE_TEST_GUIDE.md)
-
-## Preparação
-
-### Tudo dentro do Docker
+### Run everything with Docker
 
 ```bash
-docker compose --profile app up -d --build
+docker compose -p url-shortener --profile app up -d --build
 ```
 
-### Node local e somente infraestrutura no Docker
+### Run Node.js locally with Docker infrastructure
 
 ```bash
 cp .env.example .env
 npm install
-docker compose up -d
+docker compose -p url-shortener up -d
 npx prisma generate
 npx prisma migrate deploy
 ```
 
-Em dois terminais:
+Start the API and worker in separate terminals:
 
 ```bash
 npm run dev:optimized
 npm run worker
 ```
 
-Crie uma URL:
+## Environment
+
+The backend `.env` file is the single source of truth for CORS. Set
+`CORS_ALLOWED_ORIGIN` to the exact frontend origin before starting or recreating
+the API. For example:
+
+```dotenv
+CORS_ALLOWED_ORIGIN=http://localhost:5173
+```
+
+After changing this value, restart the local API or recreate only the Docker
+Compose API service so the container receives the updated environment:
+
+```bash
+docker compose -p url-shortener --profile app up -d --no-deps --force-recreate api
+```
+
+## API usage
+
+Create a short URL:
 
 ```bash
 curl -X POST http://localhost:5000/api/v1/shortener \
@@ -51,13 +60,13 @@ curl -X POST http://localhost:5000/api/v1/shortener \
   -d '{"url":"https://example.com"}'
 ```
 
-Abra o código retornado:
+Open the returned short code:
 
 ```bash
-curl -i http://localhost:5000/SEU_SHORT_CODE
+curl -i http://localhost:5000/YOUR_SHORT_CODE
 ```
 
-## Scripts
+## Development commands
 
 ```bash
 npm run dev
@@ -65,6 +74,11 @@ npm run dev:optimized
 npm run dev:baseline
 npm run worker
 npm run benchmark
+```
+
+## Quality commands
+
+```bash
 npm test
 npm run typecheck
 npm run build

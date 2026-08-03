@@ -1,0 +1,137 @@
+.hero {
+  position: relative;
+  display: grid;
+  align-content: center;
+  width: min(100%, 82rem);
+  min-height: 38rem;
+  margin-inline: auto;
+  padding: clamp(3rem, 8vw, 6.5rem) 1.5rem clamp(4rem, 8vw, 6rem);
+  isolation: isolate;
+}
+
+.intro {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 58rem);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.1rem;
+  color: var(--deep-violet);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  animation: riseIn 520ms ease-out both;
+}
+
+.eyebrow::before {
+  width: 1.75rem;
+  height: 2px;
+  background: var(--circuit-violet);
+  content: '';
+}
+
+.title {
+  margin: 0;
+  color: var(--graphite-ink);
+  font-family: 'Bricolage Grotesque Variable', sans-serif;
+  font-size: clamp(3.25rem, 8vw, 6.75rem);
+  font-stretch: 90%;
+  font-weight: 680;
+  letter-spacing: -0.052em;
+  line-height: 0.88;
+  text-wrap: balance;
+  word-spacing: 0.04em;
+  animation: riseIn 620ms 70ms ease-out both;
+}
+
+.title span {
+  display: block;
+  color: var(--deep-violet);
+}
+
+.description {
+  width: min(100%, 34rem);
+  margin: 1.5rem auto 0;
+  color: #655d6c;
+  font-size: clamp(1rem, 2vw, 1.13rem);
+  line-height: 1.7;
+  text-wrap: balance;
+  animation: riseIn 620ms 140ms ease-out both;
+}
+
+.workspace {
+  position: relative;
+  z-index: 3;
+  width: min(100%, 56rem);
+  margin: clamp(2.3rem, 5vw, 3.7rem) auto 0;
+  padding: 0.85rem;
+  background: rgb(255 255 255 / 94%);
+  border: 1px solid rgb(94 56 141 / 16%);
+  border-radius: 1.65rem;
+  box-shadow: 0 1.4rem 4rem rgb(61 39 87 / 12%);
+  animation: riseIn 680ms 210ms ease-out both;
+}
+
+.routeLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.15rem 0.45rem 0.75rem;
+  color: #766d7d;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.routeLabel span:nth-child(2) {
+  color: var(--circuit-violet);
+  font-size: 0.9rem;
+}
+
+@keyframes riseIn {
+  from {
+    transform: translateY(1rem);
+  }
+}
+
+@media (max-width: 40rem) {
+  .hero {
+    min-height: auto;
+    padding: 3.2rem 1rem 3.5rem;
+  }
+
+  .title {
+    font-size: clamp(3.15rem, 16vw, 4.7rem);
+    line-height: 0.9;
+  }
+
+  .description {
+    margin-top: 1.15rem;
+    font-size: 0.96rem;
+  }
+
+  .workspace {
+    margin-top: 2rem;
+    padding: 0.65rem;
+    border-radius: 1.35rem;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eyebrow,
+  .title,
+  .description,
+  .workspace {
+    animation: none;
+  }
+}
