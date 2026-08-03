@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ShortUrlResult } from './ShortUrlResult'
 
-const shortCode = 'abc123de456789ff'
+const shortCode = 'aB3dE5g7'
 const publicShortUrl = `https://go.example.com/${shortCode}`
 
 describe('ShortUrlResult', () => {

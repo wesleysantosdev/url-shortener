@@ -89,6 +89,11 @@
   color: #9c2f47;
 }
 
+.successMessage {
+  color: var(--confirmed-green);
+  font-weight: 700;
+}
+
 @media (max-width: 40rem) {
   .controlRow {
     grid-template-columns: minmax(0, 1fr);

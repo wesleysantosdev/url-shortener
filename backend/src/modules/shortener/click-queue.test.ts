@@ -1,14 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { shortCode } from '../../tests/helpers/url.fixture'
 
-const transactionMock = vi.hoisted(() => ({
-  rpush: vi.fn(),
-  ltrim: vi.fn(),
-  exec: vi.fn(),
-}))
-
 const redisMock = vi.hoisted(() => ({
-  multi: vi.fn(),
+  eval: vi.fn(),
   lpop: vi.fn(),
   lpush: vi.fn(),
 }))
@@ -29,54 +23,52 @@ import clickQueue from './click-queue'
 
 describe('clickQueue', () => {
   beforeEach(() => {
-    transactionMock.rpush.mockReturnValue(transactionMock)
-    transactionMock.ltrim.mockReturnValue(transactionMock)
-    transactionMock.exec.mockResolvedValue([
-      [null, 1],
-      [null, 'OK'],
-    ])
-    redisMock.multi.mockReturnValue(transactionMock)
+    redisMock.eval.mockResolvedValue(1)
     redisMock.lpop.mockResolvedValue([])
     redisMock.lpush.mockResolvedValue(1)
   })
 
-  it('appends an event and atomically limits the queue length', async () => {
-    await clickQueue.enqueue(shortCode)
-
-    expect(transactionMock.rpush).toHaveBeenCalledWith(
-      'click-events',
+  it('appends a timestamped event only when queue capacity is available', async () => {
+    const event = {
       shortCode,
-    )
-    expect(transactionMock.ltrim).toHaveBeenCalledWith(
+      accessedAt: new Date('2026-08-03T12:00:00.000Z'),
+    }
+
+    await expect(clickQueue.enqueue(event)).resolves.toBe(true)
+
+    expect(redisMock.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('LLEN'"),
+      1,
       'click-events',
-      -1_000_000,
-      -1,
-    )
-    expect(transactionMock.exec).toHaveBeenCalledOnce()
-  })
-
-  it('logs when the oldest event is discarded', async () => {
-    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    transactionMock.exec.mockResolvedValue([
-      [null, 1_000_001],
-      [null, 'OK'],
-    ])
-
-    await clickQueue.enqueue(shortCode)
-
-    expect(log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Click queue reached its limit; oldest event discarded',
+      '1000000',
+      JSON.stringify({
+        shortCode,
+        accessedAt: '2026-08-03T12:00:00.000Z',
       }),
     )
   })
 
-  it('takes at most one batch from the head of the queue', async () => {
-    redisMock.lpop.mockResolvedValue([shortCode, shortCode])
+  it('reports a full queue without discarding an older event', async () => {
+    redisMock.eval.mockResolvedValue(0)
+
+    await expect(
+      clickQueue.enqueue({ shortCode, accessedAt: new Date() }),
+    ).resolves.toBe(false)
+  })
+
+  it('takes and parses timestamped events from the queue head', async () => {
+    redisMock.lpop.mockResolvedValue([
+      JSON.stringify({
+        shortCode,
+        accessedAt: '2026-08-03T12:00:00.000Z',
+      }),
+    ])
 
     await expect(clickQueue.takeBatch(500)).resolves.toEqual([
-      shortCode,
-      shortCode,
+      {
+        shortCode,
+        accessedAt: new Date('2026-08-03T12:00:00.000Z'),
+      },
     ])
     expect(redisMock.lpop).toHaveBeenCalledWith('click-events', 500)
   })
@@ -88,13 +80,27 @@ describe('clickQueue', () => {
   })
 
   it('puts a failed batch back at the head in its original order', async () => {
-    await clickQueue.requeue(['first', 'second', 'third'])
+    const first = {
+      shortCode,
+      accessedAt: new Date('2026-08-03T12:00:00.000Z'),
+    }
+    const second = {
+      shortCode: 'Z9y8X7w6',
+      accessedAt: new Date('2026-08-03T12:01:00.000Z'),
+    }
+
+    await clickQueue.requeue([first, second])
 
     expect(redisMock.lpush).toHaveBeenCalledWith(
       'click-events',
-      'third',
-      'second',
-      'first',
+      JSON.stringify({
+        shortCode: second.shortCode,
+        accessedAt: second.accessedAt.toISOString(),
+      }),
+      JSON.stringify({
+        shortCode: first.shortCode,
+        accessedAt: first.accessedAt.toISOString(),
+      }),
     )
   })
 })

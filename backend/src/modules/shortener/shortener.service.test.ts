@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ConflictError } from '../../shared/errors'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ShortCodeGenerationError } from '../../shared/errors'
 import {
   originalUrl,
   shortCode,
@@ -7,8 +7,16 @@ import {
 } from '../../tests/helpers/url.fixture'
 
 const repositoryMock = vi.hoisted(() => ({
-  createShortUrl: vi.fn(),
+  createShortUrlWithinCapacity: vi.fn(),
   findShortUrl: vi.fn(),
+  recordClick: vi.fn(),
+}))
+
+const generateShortCodeMock = vi.hoisted(() => vi.fn())
+
+const runtimeConfigMock = vi.hoisted(() => ({
+  maxActiveUrls: 100_000,
+  urlRetentionDays: 30,
 }))
 
 const cacheMock = vi.hoisted(() => ({
@@ -25,6 +33,18 @@ vi.mock('./shortener.repository', () => ({
   default: repositoryMock,
 }))
 
+vi.mock('./short-code', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./short-code')>()
+  return {
+    ...original,
+    generateShortCode: generateShortCodeMock,
+  }
+})
+
+vi.mock('../../config/runtime', () => ({
+  runtimeConfig: runtimeConfigMock,
+}))
+
 vi.mock('./shortener.cache', () => ({
   default: cacheMock,
 }))
@@ -34,43 +54,89 @@ vi.mock('./click-tracker', () => ({
 }))
 
 import shortenerService from './shortener.service'
+import { ShortCodeCollisionError } from './short-code'
 
 describe('shortenerService', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     repositoryMock.findShortUrl.mockResolvedValue(null)
-    repositoryMock.createShortUrl.mockResolvedValue(urlFixture)
+    repositoryMock.recordClick.mockResolvedValue(undefined)
+    repositoryMock.createShortUrlWithinCapacity.mockResolvedValue(urlFixture)
+    generateShortCodeMock.mockReturnValue('aB3dE5g7')
     cacheMock.findOriginalUrl.mockResolvedValue(undefined)
     cacheMock.storeOriginalUrl.mockResolvedValue(undefined)
     cacheMock.storeMissingShortCode.mockResolvedValue(undefined)
     clickTrackerMock.track.mockResolvedValue(undefined)
   })
 
-  it('creates a deterministic eight-character short code', async () => {
+  it('creates a random eight-character short code within capacity', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-03T12:00:00.000Z'))
+
     const result = await shortenerService.createShortUrl(originalUrl)
 
-    expect(repositoryMock.findShortUrl).toHaveBeenCalledWith(shortCode)
-    expect(repositoryMock.createShortUrl).toHaveBeenCalledWith({
-      originalUrl,
-      shortCode,
-    })
+    expect(repositoryMock.createShortUrlWithinCapacity).toHaveBeenCalledWith(
+      {
+        originalUrl,
+        shortCode: 'aB3dE5g7',
+        expiresAt: new Date('2026-09-02T12:00:00.000Z'),
+      },
+      100_000,
+    )
     expect(result).toBe(urlFixture)
   })
 
-  it('throws a conflict error when the short code already exists', async () => {
-    repositoryMock.findShortUrl.mockResolvedValue(urlFixture)
-    const operation = shortenerService.createShortUrl(originalUrl)
+  it('allows the same original URL to receive different short codes', async () => {
+    generateShortCodeMock
+      .mockReturnValueOnce('aB3dE5g7')
+      .mockReturnValueOnce('Z9y8X7w6')
 
-    await expect(operation).rejects.toMatchObject({
-      statusCode: 409,
-      code: 'SHORT_URL_ALREADY_EXISTS',
-    })
-    await expect(operation).rejects.toBeInstanceOf(ConflictError)
-    expect(repositoryMock.createShortUrl).not.toHaveBeenCalled()
+    await shortenerService.createShortUrl(originalUrl)
+    await shortenerService.createShortUrl(originalUrl)
+
+    expect(repositoryMock.createShortUrlWithinCapacity).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ originalUrl, shortCode: 'aB3dE5g7' }),
+      100_000,
+    )
+    expect(repositoryMock.createShortUrlWithinCapacity).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ originalUrl, shortCode: 'Z9y8X7w6' }),
+      100_000,
+    )
   })
 
-  it('propagates repository errors without replacing them', async () => {
+  it('retries a short-code collision without exposing a conflict', async () => {
+    generateShortCodeMock
+      .mockReturnValueOnce('aB3dE5g7')
+      .mockReturnValueOnce('Z9y8X7w6')
+    repositoryMock.createShortUrlWithinCapacity
+      .mockRejectedValueOnce(new ShortCodeCollisionError())
+      .mockResolvedValueOnce(urlFixture)
+
+    await expect(
+      shortenerService.createShortUrl(originalUrl),
+    ).resolves.toBe(urlFixture)
+    expect(repositoryMock.createShortUrlWithinCapacity).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns a service error after five short-code collisions', async () => {
+    repositoryMock.createShortUrlWithinCapacity.mockRejectedValue(
+      new ShortCodeCollisionError(),
+    )
+
+    const operation = shortenerService.createShortUrl(originalUrl)
+
+    await expect(operation).rejects.toBeInstanceOf(ShortCodeGenerationError)
+    expect(repositoryMock.createShortUrlWithinCapacity).toHaveBeenCalledTimes(5)
+  })
+
+  it('propagates non-collision repository errors without replacing them', async () => {
     const repositoryError = new Error('repository unavailable')
-    repositoryMock.findShortUrl.mockRejectedValue(repositoryError)
+    repositoryMock.createShortUrlWithinCapacity.mockRejectedValue(repositoryError)
 
     await expect(shortenerService.createShortUrl(originalUrl)).rejects.toBe(
       repositoryError,
@@ -98,6 +164,26 @@ describe('shortenerService', () => {
       originalUrl,
     )
     expect(clickTrackerMock.track).toHaveBeenCalledWith(shortCode)
+  })
+
+  it('revives a quarantined database result before redirecting', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-03T12:00:00.000Z'))
+    repositoryMock.findShortUrl.mockResolvedValue({
+      ...urlFixture,
+      quarantinedAt: new Date('2026-08-03T10:00:00.000Z'),
+    })
+
+    await expect(shortenerService.resolveShortUrl(shortCode)).resolves.toBe(
+      originalUrl,
+    )
+    expect(repositoryMock.recordClick).toHaveBeenCalledWith({
+      shortCode,
+      count: 1,
+      lastAccessedAt: new Date('2026-08-03T12:00:00.000Z'),
+      expiresAt: new Date('2026-09-02T12:00:00.000Z'),
+    })
+    expect(clickTrackerMock.track).not.toHaveBeenCalled()
   })
 
   it('returns not found from negative cache without querying PostgreSQL', async () => {

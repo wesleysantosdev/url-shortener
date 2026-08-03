@@ -1,7 +1,7 @@
 import { redis } from '../../config/redis'
 import { runtimeConfig } from '../../config/runtime'
 
-const CACHE_KEY_PREFIX = 'url-cache:'
+const CACHE_KEY_PREFIX = 'url-cache:v2:'
 const MISSING_SHORT_CODE = '__SHORT_URL_NOT_FOUND__'
 
 function cacheKey(shortCode: string): string {
@@ -69,6 +69,21 @@ const shortenerCache = {
       MISSING_SHORT_CODE,
       runtimeConfig.negativeCacheTtlSeconds,
     )
+  },
+
+  async invalidate(shortCodes: string[]): Promise<void> {
+    if (!runtimeConfig.cacheEnabled || shortCodes.length === 0) {
+      return
+    }
+
+    try {
+      await redis.del(...shortCodes.map(cacheKey))
+    } catch (error: unknown) {
+      console.error({
+        message: 'Redis cache invalidation failed; lifecycle continued',
+        error,
+      })
+    }
   },
 }
 

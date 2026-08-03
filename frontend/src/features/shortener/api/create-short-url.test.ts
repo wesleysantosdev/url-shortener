@@ -8,18 +8,22 @@ const originalUrl = 'https://example.com/articles/a-long-path'
 const createdShortUrlResponse = {
   message: 'Short URL created successfully',
   data: {
-    id: 'cm123456789',
-    shortCode: 'abc123de456789ff',
+    id: '123e4567-e89b-42d3-a456-426614174000',
+    shortCode: 'aB3dE5g7',
     originalUrl,
     createdAt: '2026-08-03T12:00:00.000Z',
     clicks: 0,
   },
 }
 
-function jsonResponse(payload: unknown, status: number): Response {
+function jsonResponse(
+  payload: unknown,
+  status: number,
+  headers: HeadersInit = {},
+): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   })
 }
 
@@ -68,6 +72,33 @@ describe('createShortUrl', () => {
       code: 'SHORT_URL_ALREADY_EXISTS',
       status: 409,
       message: problemDetails.detail,
+    })
+  })
+
+  it('preserves Retry-After for a creation rate limit', async () => {
+    const problemDetails = {
+      type: 'about:blank',
+      title: 'Too Many Requests',
+      status: 429,
+      detail: 'Too many short URL creation requests',
+      instance: '/api/v1/shortener',
+      code: 'CREATION_RATE_LIMIT_EXCEEDED',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          jsonResponse(problemDetails, 429, { 'Retry-After': '42' }),
+        ),
+    )
+
+    await expect(
+      createShortUrl(originalUrl, 'https://api.example.com'),
+    ).rejects.toMatchObject({
+      code: 'CREATION_RATE_LIMIT_EXCEEDED',
+      status: 429,
+      retryAfterSeconds: 42,
     })
   })
 

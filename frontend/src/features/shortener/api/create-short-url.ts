@@ -4,11 +4,11 @@ import { runtimeConfig } from '../../../shared/config/runtime-config'
 const absoluteHttpUrlSchema = z.url().refine((value) => {
   const protocol = new URL(value).protocol
   return protocol === 'http:' || protocol === 'https:'
-})
+}).pipe(z.string().max(2_048))
 
-const createdShortUrlSchema = z.object({
-  id: z.string().min(1),
-  shortCode: z.string().regex(/^(?:[a-f0-9]{8}|[a-f0-9]{16})$/),
+export const createdShortUrlSchema = z.object({
+  id: z.uuid(),
+  shortCode: z.string().regex(/^[0-9A-Za-z]{8}$/),
   originalUrl: absoluteHttpUrlSchema,
   createdAt: z.iso.datetime(),
   clicks: z.number().int().nonnegative(),
@@ -42,12 +42,19 @@ export type CreatedShortUrl = z.infer<typeof createdShortUrlSchema>
 export class ShortenerApiError extends Error {
   readonly code: string
   readonly status?: number
+  readonly retryAfterSeconds?: number
 
-  constructor(message: string, code: string, status?: number) {
+  constructor(
+    message: string,
+    code: string,
+    status?: number,
+    retryAfterSeconds?: number,
+  ) {
     super(message)
     this.name = 'ShortenerApiError'
     this.code = code
     this.status = status
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 
@@ -66,7 +73,11 @@ async function readResponsePayload(response: Response): Promise<unknown> {
   }
 }
 
-function throwProblemDetails(payload: unknown, status: number): never {
+function throwProblemDetails(
+  payload: unknown,
+  status: number,
+  retryAfterSeconds?: number,
+): never {
   const parsedProblem = problemDetailsSchema.safeParse(payload)
 
   if (parsedProblem.success) {
@@ -74,6 +85,7 @@ function throwProblemDetails(payload: unknown, status: number): never {
       parsedProblem.data.detail,
       parsedProblem.data.code,
       status,
+      retryAfterSeconds,
     )
   }
 
@@ -106,7 +118,18 @@ export async function createShortUrl(
   const payload = await readResponsePayload(response)
 
   if (!response.ok) {
-    throwProblemDetails(payload, response.status)
+    const rawRetryAfter = response.headers.get('Retry-After')
+    const retryAfterSeconds = rawRetryAfter
+      ? Number.parseInt(rawRetryAfter, 10)
+      : undefined
+
+    throwProblemDetails(
+      payload,
+      response.status,
+      retryAfterSeconds !== undefined && retryAfterSeconds > 0
+        ? retryAfterSeconds
+        : undefined,
+    )
   }
 
   const parsedResponse = createShortUrlResponseSchema.safeParse(payload)

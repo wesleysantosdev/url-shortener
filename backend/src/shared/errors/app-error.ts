@@ -12,6 +12,7 @@ interface AppErrorOptions {
   errors?: ErrorDetail[]
   isOperational?: boolean
   cause?: unknown
+  retryAfterSeconds?: number
 }
 
 export class AppError extends Error {
@@ -21,6 +22,7 @@ export class AppError extends Error {
   readonly detail: string
   readonly errors?: ErrorDetail[]
   readonly isOperational: boolean
+  readonly retryAfterSeconds?: number
 
   constructor({
     statusCode,
@@ -30,6 +32,7 @@ export class AppError extends Error {
     errors,
     isOperational = true,
     cause,
+    retryAfterSeconds,
   }: AppErrorOptions) {
     super(detail, { cause })
 
@@ -40,6 +43,7 @@ export class AppError extends Error {
     this.detail = detail
     this.errors = errors
     this.isOperational = isOperational
+    this.retryAfterSeconds = retryAfterSeconds
 
     Error.captureStackTrace?.(this, new.target)
   }

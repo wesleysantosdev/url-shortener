@@ -5,6 +5,8 @@ import {
   shortCodeSchema,
 } from './shortener.schema'
 import shortenerService from './shortener.service'
+import { toCreatedShortUrlDto } from './shortener.type'
+import { creationRateLimiter } from './creation-rate-limiter'
 
 const shortenerController = {
   async createShortUrl(
@@ -12,11 +14,25 @@ const shortenerController = {
     response: Response,
   ): Promise<Response> {
     const { url } = request.body
-    const data = await shortenerService.createShortUrl(url)
+    const identity: unknown = response.locals.creationRateLimitIdentity
+
+    if (typeof identity !== 'string') {
+      throw new Error('Creation rate-limit identity is missing')
+    }
+
+    const reservation = await creationRateLimiter.reserveDaily(identity)
+    let createdUrl
+
+    try {
+      createdUrl = await shortenerService.createShortUrl(url)
+    } catch (error: unknown) {
+      await creationRateLimiter.refundDaily(reservation)
+      throw error
+    }
 
     return response.status(201).json({
       message: 'Short URL created successfully',
-      data,
+      data: toCreatedShortUrlDto(createdUrl),
     })
   },
 

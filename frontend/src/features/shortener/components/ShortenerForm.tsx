@@ -5,13 +5,18 @@ import {
   createShortUrl,
 } from '../api/create-short-url'
 import { shortenerFormSchema } from '../schemas/shortener-form-schema'
-import { ShortUrlResult } from './ShortUrlResult'
+import {
+  addShortUrlToHistory,
+  loadShortUrlHistory,
+  saveShortUrlHistory,
+} from '../api/short-url-history'
+import { ShortUrlHistory } from './ShortUrlHistory'
 import styles from './ShortenerForm.module.css'
 
 type SubmissionState =
   | { status: 'idle' }
   | { status: 'pending' }
-  | { status: 'success'; shortUrl: CreatedShortUrl }
+  | { status: 'success' }
   | { status: 'error'; message: string }
 
 const initialSubmissionState: SubmissionState = { status: 'idle' }
@@ -21,8 +26,23 @@ function requestErrorMessage(error: unknown): string {
     return 'Could not shorten this URL. Try again.'
   }
 
-  if (error.code === 'SHORT_URL_ALREADY_EXISTS') {
-    return 'This URL has already been shortened. Try a different URL.'
+  if (error.code === 'CREATION_RATE_LIMIT_EXCEEDED') {
+    const seconds = error.retryAfterSeconds
+
+    if (seconds && seconds >= 60) {
+      const minutes = Math.ceil(seconds / 60)
+      return `Too many links created. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`
+    }
+
+    return `Too many links created. Try again in ${seconds ?? 1} seconds.`
+  }
+
+  if (error.code === 'RATE_LIMIT_UNAVAILABLE') {
+    return 'Link creation is temporarily unavailable while abuse protection recovers. Try again shortly.'
+  }
+
+  if (error.code === 'URL_CAPACITY_REACHED') {
+    return 'This shortener has reached its current capacity. Try again after inactive links are cleared.'
   }
 
   if (error.code === 'VALIDATION_ERROR') {
@@ -37,6 +57,9 @@ export function ShortenerForm() {
   const [validationMessage, setValidationMessage] = useState<string>()
   const [submission, setSubmission] =
     useState<SubmissionState>(initialSubmissionState)
+  const [shortUrlHistory, setShortUrlHistory] = useState<CreatedShortUrl[]>(
+    loadShortUrlHistory,
+  )
   const isPending = submission.status === 'pending'
 
   function changeOriginalUrl(nextOriginalUrl: string) {
@@ -68,7 +91,10 @@ export function ShortenerForm() {
 
     try {
       const shortUrl = await createShortUrl(parsedForm.data.url)
-      setSubmission({ status: 'success', shortUrl })
+      const nextHistory = addShortUrlToHistory(shortUrlHistory, shortUrl)
+      setShortUrlHistory(nextHistory)
+      saveShortUrlHistory(nextHistory)
+      setSubmission({ status: 'success' })
     } catch (error: unknown) {
       setSubmission({ status: 'error', message: requestErrorMessage(error) })
     }
@@ -122,8 +148,11 @@ export function ShortenerForm() {
         </p>
       ) : null}
       {submission.status === 'success' ? (
-        <ShortUrlResult shortCode={submission.shortUrl.shortCode} />
+        <p className={`${styles.message} ${styles.successMessage}`} role="status">
+          Short link ready.
+        </p>
       ) : null}
+      <ShortUrlHistory shortUrls={shortUrlHistory} />
     </form>
   )
 }

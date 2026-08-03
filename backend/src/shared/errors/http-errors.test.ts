@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   ConflictError,
+  CreationRateLimitError,
   DatabaseError,
   NotFoundError,
+  RateLimitUnavailableError,
+  ShortCodeGenerationError,
+  UrlCapacityReachedError,
   ValidationError,
 } from './http-errors'
 
@@ -64,5 +68,25 @@ describe('HTTP application errors', () => {
     expect(error.detail).toBe('An unexpected error occurred')
     expect(error.isOperational).toBe(false)
     expect(error.cause).toBe(cause)
+  })
+
+  it('describes a creation rate limit with a retry delay', () => {
+    const error = new CreationRateLimitError(42)
+
+    expect(error).toMatchObject({
+      statusCode: 429,
+      code: 'CREATION_RATE_LIMIT_EXCEEDED',
+      retryAfterSeconds: 42,
+    })
+  })
+
+  it.each([
+    [new RateLimitUnavailableError(), 'RATE_LIMIT_UNAVAILABLE'],
+    [new UrlCapacityReachedError(), 'URL_CAPACITY_REACHED'],
+    [new ShortCodeGenerationError(), 'SHORT_CODE_GENERATION_FAILED'],
+  ])('creates operational service-unavailable errors', (error, code) => {
+    expect(error.statusCode).toBe(503)
+    expect(error.code).toBe(code)
+    expect(error.isOperational).toBe(true)
   })
 })

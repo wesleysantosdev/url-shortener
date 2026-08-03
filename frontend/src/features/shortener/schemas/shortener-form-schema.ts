@@ -9,6 +9,7 @@ export const shortenerFormSchema = z.object({
     .string()
     .trim()
     .min(1, { error: 'Enter a URL to shorten.' })
+    .max(2_048, { error: 'Use a URL with at most 2048 characters.' })
     .pipe(absoluteUrlSchema)
     .refine((value) => {
       if (!URL.canParse(value)) {

@@ -1,11 +1,21 @@
 import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { NotFoundError } from '../../shared/errors'
+import {
+  CreationRateLimitError,
+  NotFoundError,
+  RateLimitUnavailableError,
+} from '../../shared/errors'
 import { originalUrl, urlFixture } from '../helpers/url.fixture'
 
 const { createShortUrlMock, resolveShortUrlMock } = vi.hoisted(() => ({
   createShortUrlMock: vi.fn(),
   resolveShortUrlMock: vi.fn(),
+}))
+
+const rateLimiterMock = vi.hoisted(() => ({
+  consumeAttempt: vi.fn(),
+  reserveDaily: vi.fn(),
+  refundDaily: vi.fn(),
 }))
 
 vi.mock('../../modules/shortener/shortener.service', () => ({
@@ -15,11 +25,22 @@ vi.mock('../../modules/shortener/shortener.service', () => ({
   },
 }))
 
+vi.mock('../../modules/shortener/creation-rate-limiter', () => ({
+  creationRateLimiter: rateLimiterMock,
+}))
+
 import { app } from '../../app'
 
 describe('POST /api/v1/shortener', () => {
   beforeEach(() => {
     createShortUrlMock.mockResolvedValue(urlFixture)
+    rateLimiterMock.consumeAttempt.mockResolvedValue({ remaining: 4 })
+    rateLimiterMock.reserveDaily.mockResolvedValue({
+      key: 'daily-key',
+      member: 'reservation-id',
+      remaining: 19,
+    })
+    rateLimiterMock.refundDaily.mockResolvedValue(undefined)
   })
 
   it('returns the created short URL', async () => {
@@ -31,11 +52,16 @@ describe('POST /api/v1/shortener', () => {
     expect(response.body).toEqual({
       message: 'Short URL created successfully',
       data: {
-        ...urlFixture,
+        id: urlFixture.id,
+        shortCode: urlFixture.shortCode,
+        originalUrl: urlFixture.originalUrl,
         createdAt: urlFixture.createdAt.toISOString(),
+        clicks: urlFixture.clicks,
       },
     })
     expect(createShortUrlMock).toHaveBeenCalledWith(originalUrl)
+    expect(rateLimiterMock.consumeAttempt).toHaveBeenCalledOnce()
+    expect(rateLimiterMock.reserveDaily).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -76,6 +102,55 @@ describe('POST /api/v1/shortener', () => {
       errors: [expect.objectContaining({ path })],
     })
     expect(createShortUrlMock).not.toHaveBeenCalled()
+    expect(rateLimiterMock.consumeAttempt).toHaveBeenCalledOnce()
+    expect(rateLimiterMock.reserveDaily).not.toHaveBeenCalled()
+  })
+
+  it('returns Retry-After when the short attempt window is full', async () => {
+    rateLimiterMock.consumeAttempt.mockRejectedValue(
+      new CreationRateLimitError(42),
+    )
+
+    const response = await request(app)
+      .post('/api/v1/shortener')
+      .send({ url: originalUrl })
+
+    expect(response.status).toBe(429)
+    expect(response.headers['retry-after']).toBe('42')
+    expect(response.body).toMatchObject({
+      code: 'CREATION_RATE_LIMIT_EXCEEDED',
+      status: 429,
+    })
+    expect(createShortUrlMock).not.toHaveBeenCalled()
+  })
+
+  it('fails closed when the attempt limit cannot reach Redis', async () => {
+    rateLimiterMock.consumeAttempt.mockRejectedValue(
+      new RateLimitUnavailableError(new Error('Redis unavailable')),
+    )
+
+    const response = await request(app)
+      .post('/api/v1/shortener')
+      .send({ url: originalUrl })
+
+    expect(response.status).toBe(503)
+    expect(response.body).toMatchObject({ code: 'RATE_LIMIT_UNAVAILABLE' })
+    expect(createShortUrlMock).not.toHaveBeenCalled()
+  })
+
+  it('refunds the daily reservation when creation fails', async () => {
+    createShortUrlMock.mockRejectedValue(new Error('database unavailable'))
+
+    const response = await request(app)
+      .post('/api/v1/shortener')
+      .send({ url: originalUrl })
+
+    expect(response.status).toBe(500)
+    expect(rateLimiterMock.refundDaily).toHaveBeenCalledWith({
+      key: 'daily-key',
+      member: 'reservation-id',
+      remaining: 19,
+    })
   })
 })
 

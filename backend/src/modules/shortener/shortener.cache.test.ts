@@ -4,6 +4,7 @@ import { originalUrl, shortCode } from '../../tests/helpers/url.fixture'
 const redisMock = vi.hoisted(() => ({
   get: vi.fn(),
   set: vi.fn(),
+  del: vi.fn(),
 }))
 
 const runtimeConfigMock = vi.hoisted(() => ({
@@ -27,6 +28,7 @@ describe('shortenerCache', () => {
     runtimeConfigMock.cacheEnabled = true
     redisMock.get.mockResolvedValue(null)
     redisMock.set.mockResolvedValue('OK')
+    redisMock.del.mockResolvedValue(1)
   })
 
   it('returns the cached original URL', async () => {
@@ -35,7 +37,7 @@ describe('shortenerCache', () => {
     await expect(shortenerCache.findOriginalUrl(shortCode)).resolves.toBe(
       originalUrl,
     )
-    expect(redisMock.get).toHaveBeenCalledWith(`url-cache:${shortCode}`)
+    expect(redisMock.get).toHaveBeenCalledWith(`url-cache:v2:${shortCode}`)
   })
 
   it('distinguishes a negative-cache hit from a regular miss', async () => {
@@ -81,7 +83,7 @@ describe('shortenerCache', () => {
     await shortenerCache.storeOriginalUrl(shortCode, originalUrl)
 
     expect(redisMock.set).toHaveBeenCalledWith(
-      `url-cache:${shortCode}`,
+      `url-cache:v2:${shortCode}`,
       originalUrl,
       'EX',
       86_400,
@@ -92,7 +94,7 @@ describe('shortenerCache', () => {
     await shortenerCache.storeMissingShortCode(shortCode)
 
     expect(redisMock.set).toHaveBeenCalledWith(
-      `url-cache:${shortCode}`,
+      `url-cache:v2:${shortCode}`,
       '__SHORT_URL_NOT_FOUND__',
       'EX',
       60,
@@ -112,6 +114,18 @@ describe('shortenerCache', () => {
         message: 'Redis cache write failed; continuing without cache',
         error,
       }),
+    )
+  })
+
+  it('invalidates lifecycle candidates in one Redis command', async () => {
+    await shortenerCache.invalidate([
+      shortCode,
+      'Z9y8X7w6',
+    ])
+
+    expect(redisMock.del).toHaveBeenCalledWith(
+      `url-cache:v2:${shortCode}`,
+      'url-cache:v2:Z9y8X7w6',
     )
   })
 })

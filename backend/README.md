@@ -50,6 +50,16 @@ Compose API service so the container receives the updated environment:
 docker compose -p url-shortener --profile app up -d --no-deps --force-recreate api
 ```
 
+Anonymous creation is protected by Redis-backed rolling limits. Set
+`RATE_LIMIT_IP_HASH_SECRET` to at least 32 random characters. The default
+deployment trusts no forwarded address; set `TRUST_PROXY_HOPS` to the exact
+number of reverse proxies in front of Express before using client IP limits
+behind a proxy. Never enable arbitrary proxy trust.
+
+The default policy permits 5 attempts per minute and 20 successful creations per
+rolling 24 hours for each anonymized IP, with a global capacity of 100,000 active
+or quarantined links. All values are documented in `.env.example`.
+
 ## API usage
 
 Create a short URL:

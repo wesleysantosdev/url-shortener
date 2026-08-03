@@ -10,6 +10,8 @@ const repositoryMock = vi.hoisted(() => ({
   incrementClicksBatch: vi.fn(),
 }))
 
+const runtimeConfigMock = vi.hoisted(() => ({ urlRetentionDays: 30 }))
+
 vi.mock('./click-queue', () => ({
   default: clickQueueMock,
 }))
@@ -17,6 +19,8 @@ vi.mock('./click-queue', () => ({
 vi.mock('./shortener.repository', () => ({
   default: repositoryMock,
 }))
+
+vi.mock('../../config/runtime', () => ({ runtimeConfig: runtimeConfigMock }))
 
 import clickWorkerService from './click-worker.service'
 
@@ -37,9 +41,12 @@ describe('clickWorkerService', () => {
 
   it('groups repeated short codes before updating PostgreSQL', async () => {
     clickQueueMock.takeBatch.mockResolvedValue([
-      shortCode,
-      shortCode,
-      'abcdef0123456789',
+      { shortCode, accessedAt: new Date('2026-08-03T12:00:00.000Z') },
+      { shortCode, accessedAt: new Date('2026-08-03T12:05:00.000Z') },
+      {
+        shortCode: 'Z9y8X7w6',
+        accessedAt: new Date('2026-08-03T11:00:00.000Z'),
+      },
     ])
 
     await expect(clickWorkerService.processNextBatch(500)).resolves.toMatchObject({
@@ -47,13 +54,29 @@ describe('clickWorkerService', () => {
       distinctUrlCount: 2,
     })
     expect(repositoryMock.incrementClicksBatch).toHaveBeenCalledWith([
-      { shortCode, count: 2 },
-      { shortCode: 'abcdef0123456789', count: 1 },
+      {
+        shortCode,
+        count: 2,
+        lastAccessedAt: new Date('2026-08-03T12:05:00.000Z'),
+        expiresAt: new Date('2026-09-02T12:05:00.000Z'),
+      },
+      {
+        shortCode: 'Z9y8X7w6',
+        count: 1,
+        lastAccessedAt: new Date('2026-08-03T11:00:00.000Z'),
+        expiresAt: new Date('2026-09-02T11:00:00.000Z'),
+      },
     ])
   })
 
   it('requeues the complete batch when PostgreSQL fails', async () => {
-    const events = [shortCode, 'abcdef0123456789']
+    const events = [
+      { shortCode, accessedAt: new Date('2026-08-03T12:00:00.000Z') },
+      {
+        shortCode: 'Z9y8X7w6',
+        accessedAt: new Date('2026-08-03T12:01:00.000Z'),
+      },
+    ]
     const error = new Error('PostgreSQL unavailable')
     clickQueueMock.takeBatch.mockResolvedValue(events)
     repositoryMock.incrementClicksBatch.mockRejectedValue(error)

@@ -35,6 +35,11 @@ export const errorHandler: ErrorRequestHandler = (
 
   response
     .status(normalizedError.statusCode)
+    .set(
+      normalizedError.retryAfterSeconds === undefined
+        ? {}
+        : { 'Retry-After': String(normalizedError.retryAfterSeconds) },
+    )
     .set('Content-Type', 'application/problem+json')
     .json(problemDetails)
 }

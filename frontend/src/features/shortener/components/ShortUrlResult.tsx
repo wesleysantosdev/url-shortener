@@ -4,6 +4,8 @@ import styles from './ShortUrlResult.module.css'
 
 interface ShortUrlResultProps {
   shortCode: string
+  originalUrl?: string
+  showStatus?: boolean
   publicShortUrlBase?: string
 }
 
@@ -11,11 +13,14 @@ type CopyState = 'idle' | 'copied' | 'error'
 
 export function ShortUrlResult({
   shortCode,
+  originalUrl,
+  showStatus = true,
   publicShortUrlBase = runtimeConfig.publicShortUrlBase,
 }: ShortUrlResultProps) {
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const normalizedBaseUrl = publicShortUrlBase.replace(/\/$/, '')
   const publicShortUrl = `${normalizedBaseUrl}/${encodeURIComponent(shortCode)}`
+  const titleId = `short-url-result-${shortCode}`
 
   async function copyShortUrl() {
     try {
@@ -27,10 +32,19 @@ export function ShortUrlResult({
   }
 
   return (
-    <section className={styles.result} aria-labelledby="short-url-result-title">
-      <p className={styles.status} id="short-url-result-title" role="status">
-        Short link ready.
+    <section className={styles.result} aria-labelledby={titleId}>
+      <p
+        className={styles.status}
+        id={titleId}
+        role={showStatus ? 'status' : undefined}
+      >
+        {showStatus ? 'Short link ready.' : 'Saved route'}
       </p>
+      {originalUrl ? (
+        <p className={styles.originalUrl} title={originalUrl}>
+          {originalUrl}
+        </p>
+      ) : null}
       <a
         className={styles.shortUrl}
         href={publicShortUrl}

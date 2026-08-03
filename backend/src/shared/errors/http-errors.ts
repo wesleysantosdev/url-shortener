@@ -47,3 +47,50 @@ export class DatabaseError extends AppError {
     })
   }
 }
+
+export class CreationRateLimitError extends AppError {
+  constructor(retryAfterSeconds: number) {
+    super({
+      statusCode: 429,
+      code: 'CREATION_RATE_LIMIT_EXCEEDED',
+      title: 'Too Many Requests',
+      detail: 'Too many short URL creation requests',
+      retryAfterSeconds,
+    })
+  }
+}
+
+export class RateLimitUnavailableError extends AppError {
+  constructor(cause?: unknown) {
+    super({
+      statusCode: 503,
+      code: 'RATE_LIMIT_UNAVAILABLE',
+      title: 'Service Unavailable',
+      detail: 'Short URL creation is temporarily unavailable',
+      cause,
+    })
+  }
+}
+
+export class UrlCapacityReachedError extends AppError {
+  constructor() {
+    super({
+      statusCode: 503,
+      code: 'URL_CAPACITY_REACHED',
+      title: 'Service Unavailable',
+      detail: 'Short URL capacity has been reached',
+    })
+  }
+}
+
+export class ShortCodeGenerationError extends AppError {
+  constructor(cause?: unknown) {
+    super({
+      statusCode: 503,
+      code: 'SHORT_CODE_GENERATION_FAILED',
+      title: 'Service Unavailable',
+      detail: 'A unique short code could not be generated',
+      cause,
+    })
+  }
+}

@@ -11,6 +11,7 @@ import {
 
 export const app: Application = express()
 
+app.set('trust proxy', runtimeConfig.trustProxyHops)
 app.use(cors({ origin: [runtimeConfig.corsAllowedOrigin] }))
 app.use(express.json())
 app.use('/api', router)

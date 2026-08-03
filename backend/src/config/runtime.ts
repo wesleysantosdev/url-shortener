@@ -11,6 +11,17 @@ export interface RuntimeConfig {
   clickBatchIntervalMs: number
   clickQueueMaxLength: number
   corsAllowedOrigin: string
+  creationAttemptLimit: number
+  creationAttemptWindowSeconds: number
+  creationDailyLimit: number
+  creationDailyWindowSeconds: number
+  maxActiveUrls: number
+  rateLimitIpHashSecret: string
+  trustProxyHops: number
+  urlRetentionDays: number
+  urlDeletionGraceHours: number
+  urlCleanupIntervalHours: number
+  urlCleanupBatchSize: number
 }
 
 function httpOrigin(
@@ -62,6 +73,38 @@ function positiveInteger(
 
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`Invalid ${name}: expected a positive integer`)
+  }
+
+  return value
+}
+
+function nonNegativeInteger(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  defaultValue: number,
+): number {
+  const rawValue = env[name]
+
+  if (rawValue === undefined) {
+    return defaultValue
+  }
+
+  const value = Number(rawValue)
+
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`Invalid ${name}: expected a non-negative integer`)
+  }
+
+  return value
+}
+
+function strongSecret(env: NodeJS.ProcessEnv, name: string): string {
+  const value = env[name]
+
+  if (value === undefined || value.length < 32) {
+    throw new Error(
+      `Invalid ${name}: expected at least 32 characters`,
+    )
   }
 
   return value
@@ -139,6 +182,41 @@ export function loadRuntimeConfig(
     corsAllowedOrigin: httpOrigin(
       env,
       'CORS_ALLOWED_ORIGIN',
+    ),
+    creationAttemptLimit: positiveInteger(
+      env,
+      'CREATION_ATTEMPT_LIMIT',
+      5,
+    ),
+    creationAttemptWindowSeconds: positiveInteger(
+      env,
+      'CREATION_ATTEMPT_WINDOW_SECONDS',
+      60,
+    ),
+    creationDailyLimit: positiveInteger(env, 'CREATION_DAILY_LIMIT', 20),
+    creationDailyWindowSeconds: positiveInteger(
+      env,
+      'CREATION_DAILY_WINDOW_SECONDS',
+      86_400,
+    ),
+    maxActiveUrls: positiveInteger(env, 'MAX_ACTIVE_URLS', 100_000),
+    rateLimitIpHashSecret: strongSecret(env, 'RATE_LIMIT_IP_HASH_SECRET'),
+    trustProxyHops: nonNegativeInteger(env, 'TRUST_PROXY_HOPS', 0),
+    urlRetentionDays: positiveInteger(env, 'URL_RETENTION_DAYS', 30),
+    urlDeletionGraceHours: positiveInteger(
+      env,
+      'URL_DELETION_GRACE_HOURS',
+      24,
+    ),
+    urlCleanupIntervalHours: positiveInteger(
+      env,
+      'URL_CLEANUP_INTERVAL_HOURS',
+      24,
+    ),
+    urlCleanupBatchSize: positiveInteger(
+      env,
+      'URL_CLEANUP_BATCH_SIZE',
+      1_000,
     ),
   }
 }

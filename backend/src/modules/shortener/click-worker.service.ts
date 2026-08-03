@@ -1,6 +1,7 @@
 import clickQueue from './click-queue'
 import shortenerRepository from './shortener.repository'
 import { ClickIncrement } from './shortener.type'
+import { runtimeConfig } from '../../config/runtime'
 
 interface BatchResult {
   eventCount: number
@@ -21,15 +22,34 @@ const clickWorkerService = {
       }
     }
 
-    const counts = new Map<string, number>()
+    const counts = new Map<
+      string,
+      { count: number; lastAccessedAt: Date }
+    >()
 
-    for (const shortCode of events) {
-      counts.set(shortCode, (counts.get(shortCode) ?? 0) + 1)
+    for (const event of events) {
+      const current = counts.get(event.shortCode)
+
+      counts.set(event.shortCode, {
+        count: (current?.count ?? 0) + 1,
+        lastAccessedAt:
+          !current || event.accessedAt > current.lastAccessedAt
+            ? event.accessedAt
+            : current.lastAccessedAt,
+      })
     }
 
     const increments: ClickIncrement[] = Array.from(
       counts,
-      ([shortCode, count]) => ({ shortCode, count }),
+      ([shortCode, { count, lastAccessedAt }]) => ({
+        shortCode,
+        count,
+        lastAccessedAt,
+        expiresAt: new Date(
+          lastAccessedAt.getTime() +
+            runtimeConfig.urlRetentionDays * 24 * 60 * 60 * 1_000,
+        ),
+      }),
     )
 
     try {

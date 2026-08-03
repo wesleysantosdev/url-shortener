@@ -18,6 +18,17 @@
   text-transform: uppercase;
 }
 
+.originalUrl {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #766d7d;
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .shortUrl {
   min-width: 0;
   overflow: hidden;
