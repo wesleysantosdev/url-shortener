@@ -1,34 +1,35 @@
 # URL Shortener Backend
 
-API didática de encurtamento de URLs com Node.js, Express, TypeScript, Prisma,
-PostgreSQL e Redis. O projeto prioriza uma arquitetura pequena que ainda permite
-estudar separação de camadas, cache, rate limit e ciclo de vida dos dados.
+Educational URL shortening API built with Node.js, Express, TypeScript, Prisma,
+PostgreSQL, and Redis. The project prioritizes a small architecture that still
+allows studying layer separation, caching, rate limiting, and the data lifecycle.
 
-## Como funciona
+## How it works
 
-1. `POST /api/v1/shortener` valida a URL e aplica rate limit por IP.
-2. PostgreSQL cria um `BIGINT` sequencial.
-3. O ID passa por uma permutação reversível baseada em `SHORT_CODE_SECRET`.
-4. O número embaralhado vira Base62 com 4 a 6 caracteres.
-5. A API devolve somente a URL pública completa.
-6. `GET /:shortCode` decodifica o ID, usa Redis como cache de leitura e responde
-   com redirecionamento `302`.
-7. Cada acesso incrementa `clicks` e atualiza `lastAccessedAt` diretamente.
-8. Uma rotina diária apaga URLs sem atividade por 180 dias.
+1. `POST /api/v1/shortener` validates the URL and applies rate limiting by IP.
+2. PostgreSQL creates a sequential `BIGINT`.
+3. The ID goes through a reversible permutation based on `SHORT_CODE_SECRET`.
+4. The shuffled number is converted to Base62 with 4 to 6 characters.
+5. The API returns only the complete public URL.
+6. `GET /:shortCode` decodes the ID, uses Redis as a read cache, and responds
+   with a `302` redirect.
+7. Each access increments `clicks` and updates `lastAccessedAt` directly.
+8. A daily routine deletes URLs with no activity for 180 days.
 
-O shortcode não é salvo no banco e não há consulta de colisão: IDs diferentes
-sempre produzem códigos diferentes dentro do espaço de `62^6` possibilidades.
-A transformação oculta a sequência, mas não é criptografia nem autenticação.
+The short code is not stored in the database, and there is no collision lookup:
+different IDs always produce different codes within the `62^6` possibility
+space. The transformation hides the sequence, but it is neither encryption nor
+authentication.
 
-## Executar com Docker
+## Run with Docker
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
 
-O Compose inicia somente PostgreSQL, Redis e API. A API aplica migrations antes
-de iniciar o servidor.
+Compose starts only PostgreSQL, Redis, and the API. The API applies migrations
+before starting the server.
 
 ```bash
 docker compose ps
@@ -36,7 +37,7 @@ docker compose logs -f api
 docker compose down
 ```
 
-## Executar Node.js localmente
+## Run Node.js locally
 
 ```bash
 npm install
@@ -46,29 +47,28 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-## Variáveis principais
+## Main variables
+- `DATABASE_URL`: PostgreSQL connection.
+- `REDIS_URL`: Redis connection.
+- `CORS_ALLOWED_ORIGIN`: exact frontend origin.
+- `PUBLIC_SHORT_URL_BASE`: prefix returned to the user, such as
+  `https://shorten.pro`.
+- `SHORT_CODE_SECRET`: stable secret with at least 32 characters. Changing it
+  breaks the decoding of existing links.
+- `RATE_LIMIT_IP_HASH_SECRET`: different secret used to anonymize IPs.
+- `URL_RETENTION_DAYS`: defaults to 180 days.
 
-- `DATABASE_URL`: conexão PostgreSQL.
-- `REDIS_URL`: conexão Redis.
-- `CORS_ALLOWED_ORIGIN`: origem exata do frontend.
-- `PUBLIC_SHORT_URL_BASE`: prefixo devolvido ao usuário, como
-  `https://short.ly`.
-- `SHORT_CODE_SECRET`: secret estável com pelo menos 32 caracteres. Alterá-la
-  quebra a decodificação dos links existentes.
-- `RATE_LIMIT_IP_HASH_SECRET`: secret diferente para anonimizar IPs.
-- `URL_RETENTION_DAYS`: padrão de 180 dias.
+See all values in `.env.example`. In production, use random secrets and a
+secrets manager.
 
-Veja todos os valores em `.env.example`. Em produção, use secrets aleatórias e
-um gerenciador de segredos.
-
-Ao alterar uma variável usada pela API, recrie o container para que o Compose
-carregue o novo valor:
+After changing a variable used by the API, recreate the container so Compose
+loads the new value:
 
 ```bash
 docker compose -p url-shortener up -d --no-deps --force-recreate api
 ```
 
-## Contrato HTTP
+## HTTP contract
 
 ```bash
 curl -X POST http://localhost:5000/api/v1/shortener \
@@ -82,20 +82,20 @@ curl -X POST http://localhost:5000/api/v1/shortener \
 }
 ```
 
-O link retornado responde `302`. Falhas usam `application/problem+json` com um
-`code` estável para o cliente.
+The returned link responds with `302`. Failures use `application/problem+json`
+with a stable `code` for the client.
 
-## Rate limit
+## Rate limiting
 
-Redis mantém duas janelas móveis por IP anonimizado:
+Redis maintains two sliding windows per anonymized IP:
 
-- 5 tentativas válidas por minuto;
-- 20 criações bem-sucedidas por 24 horas.
+- 5 valid attempts per minute;
+- 20 successful creations per 24 hours.
 
-Se Redis estiver indisponível, a criação falha fechada para não perder a proteção.
-Redirecionamentos continuam consultando PostgreSQL quando o cache falha.
+If Redis is unavailable, creation fails closed to preserve protection.
+Redirects continue querying PostgreSQL when the cache fails.
 
-## Qualidade
+## Quality
 
 ```bash
 npm test
