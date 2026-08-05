@@ -16,12 +16,10 @@ function httpOrigin(fallback: string) {
 
 const runtimeEnvironmentSchema = z.object({
   VITE_API_BASE_URL: httpOrigin(localBackendOrigin),
-  VITE_PUBLIC_SHORT_URL_BASE: httpOrigin(localBackendOrigin),
 })
 
 export interface RuntimeConfig {
   apiBaseUrl: string
-  publicShortUrlBase: string
 }
 
 export function parseRuntimeConfig(
@@ -31,7 +29,6 @@ export function parseRuntimeConfig(
 
   return {
     apiBaseUrl: parsedEnvironment.VITE_API_BASE_URL,
-    publicShortUrlBase: parsedEnvironment.VITE_PUBLIC_SHORT_URL_BASE,
   }
 }
 

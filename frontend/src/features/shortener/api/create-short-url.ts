@@ -1,22 +1,20 @@
 import { z } from 'zod'
 import { runtimeConfig } from '../../../shared/config/runtime-config'
 
-const absoluteHttpUrlSchema = z.url().refine((value) => {
-  const protocol = new URL(value).protocol
-  return protocol === 'http:' || protocol === 'https:'
-}).pipe(z.string().max(2_048))
+export const absoluteHttpUrlSchema = z
+  .url()
+  .refine((value) => {
+    try {
+      const protocol = new URL(value).protocol
+      return protocol === 'http:' || protocol === 'https:'
+    } catch {
+      return false
+    }
+  })
+  .pipe(z.string().max(2_048))
 
-export const createdShortUrlSchema = z.object({
-  id: z.uuid(),
-  shortCode: z.string().regex(/^[0-9A-Za-z]{8}$/),
-  originalUrl: absoluteHttpUrlSchema,
-  createdAt: z.iso.datetime(),
-  clicks: z.number().int().nonnegative(),
-})
-
-const createShortUrlResponseSchema = z.object({
-  message: z.string(),
-  data: createdShortUrlSchema,
+const createShortUrlResponseSchema = z.strictObject({
+  shortUrl: absoluteHttpUrlSchema,
 })
 
 const problemDetailsSchema = z.object({
@@ -36,8 +34,6 @@ const problemDetailsSchema = z.object({
     )
     .optional(),
 })
-
-export type CreatedShortUrl = z.infer<typeof createdShortUrlSchema>
 
 export class ShortenerApiError extends Error {
   readonly code: string
@@ -99,7 +95,7 @@ function throwProblemDetails(
 export async function createShortUrl(
   originalUrl: string,
   apiBaseUrl = runtimeConfig.apiBaseUrl,
-): Promise<CreatedShortUrl> {
+): Promise<string> {
   let response: Response
 
   try {
@@ -138,5 +134,5 @@ export async function createShortUrl(
     throw invalidResponseError()
   }
 
-  return parsedResponse.data.data
+  return parsedResponse.data.shortUrl
 }

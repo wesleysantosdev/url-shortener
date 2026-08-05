@@ -1,9 +1,9 @@
-import { CreatedShortUrl } from '../api/create-short-url'
+import { ShortUrlHistoryEntry } from '../api/short-url-history'
 import { ShortUrlResult } from './ShortUrlResult'
 import styles from './ShortUrlHistory.module.css'
 
 interface ShortUrlHistoryProps {
-  shortUrls: CreatedShortUrl[]
+  shortUrls: ShortUrlHistoryEntry[]
 }
 
 export function ShortUrlHistory({ shortUrls }: ShortUrlHistoryProps) {
@@ -17,13 +17,12 @@ export function ShortUrlHistory({ shortUrls }: ShortUrlHistoryProps) {
         <h2 className={styles.heading} id="session-routes-title">
           Session routes
         </h2>
-        <span className={styles.count}>{shortUrls.length}/20</span>
       </div>
       <ol className={styles.list}>
         {shortUrls.map((shortUrl) => (
-          <li className={styles.item} key={shortUrl.id}>
+          <li className={styles.item} key={shortUrl.shortUrl}>
             <ShortUrlResult
-              shortCode={shortUrl.shortCode}
+              shortUrl={shortUrl.shortUrl}
               originalUrl={shortUrl.originalUrl}
               showStatus={false}
             />

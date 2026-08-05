@@ -8,19 +8,22 @@ export function ShortenerView() {
       <FloatingCircles />
 
       <div className={styles.intro}>
-        <p className={styles.eyebrow}>Compact links, clear moves</p>
         <h1 id="shortener-title" className={styles.title}>
           Make long links <span>easier to carry.</span>
         </h1>
         <p className={styles.description}>
-          Paste one long URL. Get a compact link that is ready to copy and share.
+          Paste your long URL and get a short link, ready to copy and share
         </p>
       </div>
 
       <div className={styles.workspace}>
         <p className={styles.routeLabel} aria-hidden="true">
           <span>Long URL</span>
-          <span>→</span>
+          <span className={styles.routeArrow}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path d="M2 8h12m-4-4 4 4-4 4" />
+            </svg>
+          </span>
           <span>Short link</span>
         </p>
         <ShortenerForm />

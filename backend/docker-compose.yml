@@ -1,34 +1,3 @@
-x-app-environment: &app-environment
-  DATABASE_URL: postgresql://admin:12345@shortener-db:5432/shortener_db
-  REDIS_URL: redis://redis:6379
-  REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-100}
-  REDIS_URL_CACHE_TTL_SECONDS: ${REDIS_URL_CACHE_TTL_SECONDS:-86400}
-  REDIS_NEGATIVE_CACHE_TTL_SECONDS: ${REDIS_NEGATIVE_CACHE_TTL_SECONDS:-60}
-  CLICK_BATCH_SIZE: ${CLICK_BATCH_SIZE:-500}
-  CLICK_BATCH_INTERVAL_MS: ${CLICK_BATCH_INTERVAL_MS:-5000}
-  CLICK_QUEUE_MAX_LENGTH: ${CLICK_QUEUE_MAX_LENGTH:-1000000}
-  CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN in backend/.env}
-  TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
-  RATE_LIMIT_IP_HASH_SECRET: ${RATE_LIMIT_IP_HASH_SECRET:?Set RATE_LIMIT_IP_HASH_SECRET in backend/.env}
-  CREATION_ATTEMPT_LIMIT: ${CREATION_ATTEMPT_LIMIT:-5}
-  CREATION_ATTEMPT_WINDOW_SECONDS: ${CREATION_ATTEMPT_WINDOW_SECONDS:-60}
-  CREATION_DAILY_LIMIT: ${CREATION_DAILY_LIMIT:-20}
-  CREATION_DAILY_WINDOW_SECONDS: ${CREATION_DAILY_WINDOW_SECONDS:-86400}
-  MAX_ACTIVE_URLS: ${MAX_ACTIVE_URLS:-100000}
-  URL_RETENTION_DAYS: ${URL_RETENTION_DAYS:-30}
-  URL_DELETION_GRACE_HOURS: ${URL_DELETION_GRACE_HOURS:-24}
-  URL_CLEANUP_INTERVAL_HOURS: ${URL_CLEANUP_INTERVAL_HOURS:-24}
-  URL_CLEANUP_BATCH_SIZE: ${URL_CLEANUP_BATCH_SIZE:-1000}
-
-x-runtime-service: &runtime-service
-  image: url-shortener-app:local
-  build:
-    context: .
-    target: runtime
-  environment: *app-environment
-  networks:
-    - shortener-network
-
 services:
   shortener-db:
     image: postgres:16-alpine
@@ -45,21 +14,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    networks:
-      - shortener-network
 
   redis:
     image: redis:7-alpine
-    command:
-      - redis-server
-      - --appendonly
-      - "yes"
-      - --appendfsync
-      - everysec
-      - --maxmemory
-      - 256mb
-      - --maxmemory-policy
-      - volatile-lru
     ports:
       - "6379:6379"
     volumes:
@@ -69,27 +26,34 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    networks:
-      - shortener-network
-
-  migrate:
-    <<: *runtime-service
-    profiles: ["app"]
-    command: ["npx", "prisma", "migrate", "deploy"]
-    restart: "no"
-    depends_on:
-      shortener-db:
-        condition: service_healthy
 
   api:
-    <<: *runtime-service
-    profiles: ["app"]
+    image: url-shortener-app:local
+    build:
+      context: .
+      target: runtime
     environment:
-      <<: *app-environment
+      DATABASE_URL: postgresql://admin:12345@shortener-db:5432/shortener_db
+      REDIS_URL: redis://redis:6379
+      REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-100}
+      REDIS_URL_CACHE_TTL_SECONDS: ${REDIS_URL_CACHE_TTL_SECONDS:-86400}
+      REDIS_NEGATIVE_CACHE_TTL_SECONDS: ${REDIS_NEGATIVE_CACHE_TTL_SECONDS:-60}
+      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN in backend/.env}
+      PUBLIC_SHORT_URL_BASE: ${PUBLIC_SHORT_URL_BASE:?Set PUBLIC_SHORT_URL_BASE in backend/.env}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
+      RATE_LIMIT_IP_HASH_SECRET: ${RATE_LIMIT_IP_HASH_SECRET:?Set RATE_LIMIT_IP_HASH_SECRET in backend/.env}
+      SHORT_CODE_SECRET: ${SHORT_CODE_SECRET:?Set SHORT_CODE_SECRET in backend/.env}
+      CREATION_ATTEMPT_LIMIT: ${CREATION_ATTEMPT_LIMIT:-5}
+      CREATION_ATTEMPT_WINDOW_SECONDS: ${CREATION_ATTEMPT_WINDOW_SECONDS:-60}
+      CREATION_DAILY_LIMIT: ${CREATION_DAILY_LIMIT:-20}
+      CREATION_DAILY_WINDOW_SECONDS: ${CREATION_DAILY_WINDOW_SECONDS:-86400}
+      URL_RETENTION_DAYS: ${URL_RETENTION_DAYS:-180}
+      URL_CLEANUP_INTERVAL_HOURS: ${URL_CLEANUP_INTERVAL_HOURS:-24}
       PORT: 5000
-      CACHE_ENABLED: ${CACHE_ENABLED:-true}
-      CLICK_TRACKING_MODE: ${CLICK_TRACKING_MODE:-async}
-    command: ["node", "dist/src/server.js"]
+    command:
+      - sh
+      - -c
+      - npx prisma migrate deploy && node dist/src/server.js
     ports:
       - "${APP_PORT:-5000}:5000"
     restart: unless-stopped
@@ -102,40 +66,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 5s
+      start_period: 10s
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      shortener-db:
+        condition: service_healthy
       redis:
         condition: service_healthy
-
-  worker:
-    <<: *runtime-service
-    profiles: ["app"]
-    command: ["node", "dist/src/worker.js"]
-    restart: unless-stopped
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-
-  benchmark:
-    image: url-shortener-tools:local
-    build:
-      context: .
-      target: tools
-    profiles: ["benchmark"]
-    environment:
-      BENCHMARK_TARGET_URL: ${BENCHMARK_TARGET_URL:-http://api:5000/replace-with-a-real-short-code}
-      BENCHMARK_CONNECTIONS: ${BENCHMARK_CONNECTIONS:-50}
-      BENCHMARK_DURATION_SECONDS: ${BENCHMARK_DURATION_SECONDS:-15}
-    networks:
-      - shortener-network
 
 volumes:
   shortener-db-data:
   shortener-redis-data:
-
-networks:
-  shortener-network:

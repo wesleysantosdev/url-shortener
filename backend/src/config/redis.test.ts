@@ -28,7 +28,7 @@ import { redis } from './redis'
 it('creates a fail-fast Redis client and handles connection errors', () => {
   expect(redisConstructorMock).toHaveBeenCalledWith('redis://redis:6379', {
     commandTimeout: 100,
-    connectTimeout: 100,
+    connectTimeout: 10_000,
     enableOfflineQueue: false,
     maxRetriesPerRequest: 1,
     retryStrategy: expect.any(Function),

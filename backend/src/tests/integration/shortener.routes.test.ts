@@ -5,7 +5,9 @@ import {
   NotFoundError,
   RateLimitUnavailableError,
 } from '../../shared/errors'
-import { originalUrl, urlFixture } from '../helpers/url.fixture'
+import { originalUrl, shortCode } from '../helpers/url.fixture'
+
+const publicShortUrl = `https://sho.rt/${shortCode}`
 
 const { createShortUrlMock, resolveShortUrlMock } = vi.hoisted(() => ({
   createShortUrlMock: vi.fn(),
@@ -33,7 +35,7 @@ import { app } from '../../app'
 
 describe('POST /api/v1/shortener', () => {
   beforeEach(() => {
-    createShortUrlMock.mockResolvedValue(urlFixture)
+    createShortUrlMock.mockResolvedValue(publicShortUrl)
     rateLimiterMock.consumeAttempt.mockResolvedValue({ remaining: 4 })
     rateLimiterMock.reserveDaily.mockResolvedValue({
       key: 'daily-key',
@@ -49,16 +51,7 @@ describe('POST /api/v1/shortener', () => {
       .send({ url: originalUrl })
 
     expect(response.status).toBe(201)
-    expect(response.body).toEqual({
-      message: 'Short URL created successfully',
-      data: {
-        id: urlFixture.id,
-        shortCode: urlFixture.shortCode,
-        originalUrl: urlFixture.originalUrl,
-        createdAt: urlFixture.createdAt.toISOString(),
-        clicks: urlFixture.clicks,
-      },
-    })
+    expect(response.body).toEqual({ shortUrl: publicShortUrl })
     expect(createShortUrlMock).toHaveBeenCalledWith(originalUrl)
     expect(rateLimiterMock.consumeAttempt).toHaveBeenCalledOnce()
     expect(rateLimiterMock.reserveDaily).toHaveBeenCalledOnce()
@@ -160,12 +153,12 @@ describe('GET /:shortCode', () => {
   })
 
   it('redirects to the original URL without allowing response caching', async () => {
-    const response = await request(app).get(`/${urlFixture.shortCode}`)
+    const response = await request(app).get(`/${shortCode}`)
 
     expect(response.status).toBe(302)
     expect(response.headers.location).toBe(originalUrl)
     expect(response.headers['cache-control']).toBe('no-store')
-    expect(resolveShortUrlMock).toHaveBeenCalledWith(urlFixture.shortCode)
+    expect(resolveShortUrlMock).toHaveBeenCalledWith(shortCode)
   })
 
   it('returns Problem Details when the short code does not exist', async () => {
@@ -173,7 +166,7 @@ describe('GET /:shortCode', () => {
       new NotFoundError('Short URL not found', 'SHORT_URL_NOT_FOUND'),
     )
 
-    const response = await request(app).get(`/${urlFixture.shortCode}`)
+    const response = await request(app).get(`/${shortCode}`)
 
     expect(response.status).toBe(404)
     expect(response.headers['content-type']).toMatch(
@@ -182,7 +175,7 @@ describe('GET /:shortCode', () => {
     expect(response.body).toMatchObject({
       status: 404,
       detail: 'Short URL not found',
-      instance: `/${urlFixture.shortCode}`,
+      instance: `/${shortCode}`,
       code: 'SHORT_URL_NOT_FOUND',
     })
   })
@@ -198,12 +191,12 @@ describe('GET /:shortCode', () => {
     expect(resolveShortUrlMock).not.toHaveBeenCalled()
   })
 
-  it('keeps redirecting legacy eight-character codes', async () => {
+  it('rejects legacy eight-character codes without querying services', async () => {
     const legacyShortCode = '100680ad'
 
     const response = await request(app).get(`/${legacyShortCode}`)
 
-    expect(response.status).toBe(302)
-    expect(resolveShortUrlMock).toHaveBeenCalledWith(legacyShortCode)
+    expect(response.status).toBe(404)
+    expect(resolveShortUrlMock).not.toHaveBeenCalled()
   })
 })

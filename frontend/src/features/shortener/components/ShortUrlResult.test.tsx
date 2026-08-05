@@ -3,17 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ShortUrlResult } from './ShortUrlResult'
 
-const shortCode = 'aB3dE5g7'
-const publicShortUrl = `https://go.example.com/${shortCode}`
+const publicShortUrl = 'https://go.example.com/aB3d'
 
 describe('ShortUrlResult', () => {
   it('renders the shortened URL as a safe external link', () => {
-    render(
-      <ShortUrlResult
-        shortCode={shortCode}
-        publicShortUrlBase="https://go.example.com"
-      />,
-    )
+    render(<ShortUrlResult shortUrl={publicShortUrl} />)
 
     expect(screen.getByRole('link', { name: publicShortUrl })).toHaveAttribute(
       'href',
@@ -30,12 +24,7 @@ describe('ShortUrlResult', () => {
     const clipboardWrite = vi
       .spyOn(navigator.clipboard, 'writeText')
       .mockResolvedValue()
-    render(
-      <ShortUrlResult
-        shortCode={shortCode}
-        publicShortUrlBase="https://go.example.com"
-      />,
-    )
+    render(<ShortUrlResult shortUrl={publicShortUrl} />)
 
     await user.click(screen.getByRole('button', { name: 'Copy link' }))
 
@@ -48,12 +37,7 @@ describe('ShortUrlResult', () => {
     vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(
       new DOMException('Clipboard unavailable'),
     )
-    render(
-      <ShortUrlResult
-        shortCode={shortCode}
-        publicShortUrlBase="https://go.example.com"
-      />,
-    )
+    render(<ShortUrlResult shortUrl={publicShortUrl} />)
 
     await user.click(screen.getByRole('button', { name: 'Copy link' }))
 

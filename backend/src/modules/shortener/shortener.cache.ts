@@ -13,10 +13,6 @@ async function store(
   value: string,
   ttlSeconds: number,
 ): Promise<void> {
-  if (!runtimeConfig.cacheEnabled) {
-    return
-  }
-
   try {
     await redis.set(cacheKey(shortCode), value, 'EX', ttlSeconds)
   } catch (error: unknown) {
@@ -31,10 +27,6 @@ const shortenerCache = {
   async findOriginalUrl(
     shortCode: string,
   ): Promise<string | null | undefined> {
-    if (!runtimeConfig.cacheEnabled) {
-      return undefined
-    }
-
     try {
       const cachedValue = await redis.get(cacheKey(shortCode))
 
@@ -72,7 +64,7 @@ const shortenerCache = {
   },
 
   async invalidate(shortCodes: string[]): Promise<void> {
-    if (!runtimeConfig.cacheEnabled || shortCodes.length === 0) {
+    if (shortCodes.length === 0) {
       return
     }
 

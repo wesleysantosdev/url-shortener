@@ -1,102 +1,44 @@
 import { runtimeConfig } from '../../config/runtime'
+import { ShortCodeCodec } from './short-code'
 import shortenerCache from './shortener.cache'
 import shortenerRepository from './shortener.repository'
 
-interface MaintenanceResult {
-  deletedCount: number
-  quarantinedCount: number
-  activeCount: number
-}
-
-async function deleteCompletedQuarantines(
-  now: Date,
-  cutoff: Date,
-): Promise<number> {
-  let deletedCount = 0
-
-  while (true) {
-    const candidates = await shortenerRepository.findDeletionCandidates(
-      cutoff,
-      runtimeConfig.urlCleanupBatchSize,
-    )
-
-    if (candidates.length === 0) {
-      break
-    }
-
-    const batchCount = await shortenerRepository.deleteQuarantinedUrls(
-      candidates.map(({ id }) => id),
-      cutoff,
-      now,
-    )
-    deletedCount += batchCount
-
-    if (batchCount > 0) {
-      await shortenerCache.invalidate(
-        candidates.map(({ shortCode }) => shortCode),
-      )
-    }
-
-    if (
-      batchCount === 0 ||
-      candidates.length < runtimeConfig.urlCleanupBatchSize
-    ) {
-      break
-    }
-  }
-
-  return deletedCount
-}
-
-async function quarantineExpiredUrls(now: Date): Promise<number> {
-  let quarantinedCount = 0
-
-  while (true) {
-    const candidates = await shortenerRepository.findExpiryCandidates(
-      now,
-      runtimeConfig.urlCleanupBatchSize,
-    )
-
-    if (candidates.length === 0) {
-      break
-    }
-
-    const batchCount = await shortenerRepository.quarantineUrls(
-      candidates.map(({ id }) => id),
-      now,
-    )
-    quarantinedCount += batchCount
-
-    if (batchCount > 0) {
-      await shortenerCache.invalidate(
-        candidates.map(({ shortCode }) => shortCode),
-      )
-    }
-
-    if (
-      batchCount === 0 ||
-      candidates.length < runtimeConfig.urlCleanupBatchSize
-    ) {
-      break
-    }
-  }
-
-  return quarantinedCount
-}
+const CLEANUP_BATCH_SIZE = 1_000
+const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1_000
+const shortCodeCodec = new ShortCodeCodec(runtimeConfig.shortCodeSecret)
 
 const urlLifecycleService = {
-  async runMaintenance(now = new Date()): Promise<MaintenanceResult> {
-    const graceCutoff = new Date(
-      now.getTime() -
-        runtimeConfig.urlDeletionGraceHours * 60 * 60 * 1_000,
+  async deleteInactiveUrls(now = new Date()): Promise<{ deletedCount: number }> {
+    const cutoff = new Date(
+      now.getTime() - runtimeConfig.urlRetentionDays * DAY_IN_MILLISECONDS,
     )
-    const deletedCount = await deleteCompletedQuarantines(now, graceCutoff)
-    const quarantinedCount = await quarantineExpiredUrls(now)
-    const activeCount = await shortenerRepository.reconcileCapacity(
-      runtimeConfig.maxActiveUrls,
-    )
+    let deletedCount = 0
 
-    return { deletedCount, quarantinedCount, activeCount }
+    while (true) {
+      const candidates = await shortenerRepository.findInactiveUrls(
+        cutoff,
+        CLEANUP_BATCH_SIZE,
+      )
+
+      if (candidates.length === 0) {
+        break
+      }
+
+      const ids = candidates.map(({ id }) => id)
+      const batchDeletedCount = await shortenerRepository.deleteInactiveUrls(
+        ids,
+        cutoff,
+      )
+
+      if (batchDeletedCount === 0) {
+        break
+      }
+
+      deletedCount += batchDeletedCount
+      await shortenerCache.invalidate(ids.map((id) => shortCodeCodec.encode(id)))
+    }
+
+    return { deletedCount }
   },
 }
 

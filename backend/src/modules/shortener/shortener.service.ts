@@ -1,81 +1,64 @@
-import { Url } from '../../../prisma/generated/client'
 import { runtimeConfig } from '../../config/runtime'
-import { NotFoundError, ShortCodeGenerationError } from '../../shared/errors'
-import clickTracker from './click-tracker'
-import {
-  generateShortCode,
-  ShortCodeCollisionError,
-} from './short-code'
+import { NotFoundError } from '../../shared/errors'
+import { ShortCodeCodec } from './short-code'
 import shortenerCache from './shortener.cache'
 import shortenerRepository from './shortener.repository'
 
+const shortCodeCodec = new ShortCodeCodec(runtimeConfig.shortCodeSecret)
+
+function shortUrlNotFound(): NotFoundError {
+  return new NotFoundError('Short URL not found', 'SHORT_URL_NOT_FOUND')
+}
+
+function decodeShortCode(shortCode: string): bigint {
+  try {
+    return shortCodeCodec.decode(shortCode)
+  } catch {
+    throw shortUrlNotFound()
+  }
+}
+
+async function recordClick(id: bigint, accessedAt: Date): Promise<void> {
+  try {
+    await shortenerRepository.recordClick(id, accessedAt)
+  } catch (error: unknown) {
+    console.error({
+      message: 'Click tracking failed',
+      error,
+    })
+  }
+}
+
 const shortenerService = {
-  async createShortUrl(url: string): Promise<Url> {
-    const expiresAt = new Date(
-      Date.now() + runtimeConfig.urlRetentionDays * 24 * 60 * 60 * 1_000,
-    )
+  async createShortUrl(originalUrl: string): Promise<string> {
+    const createdUrl = await shortenerRepository.createShortUrl(originalUrl)
+    const shortCode = shortCodeCodec.encode(createdUrl.id)
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      try {
-        return await shortenerRepository.createShortUrlWithinCapacity(
-          {
-            originalUrl: url,
-            shortCode: generateShortCode(),
-            expiresAt,
-          },
-          runtimeConfig.maxActiveUrls,
-        )
-      } catch (error: unknown) {
-        if (!(error instanceof ShortCodeCollisionError)) {
-          throw error
-        }
-
-        if (attempt === 4) {
-          throw new ShortCodeGenerationError(error)
-        }
-      }
-    }
-
-    throw new ShortCodeGenerationError()
+    return `${runtimeConfig.publicShortUrlBase}/${shortCode}`
   },
 
   async resolveShortUrl(shortCode: string): Promise<string> {
+    const id = decodeShortCode(shortCode)
     const cachedOriginalUrl = await shortenerCache.findOriginalUrl(shortCode)
 
     if (cachedOriginalUrl === null) {
-      throw new NotFoundError('Short URL not found', 'SHORT_URL_NOT_FOUND')
+      throw shortUrlNotFound()
     }
 
     if (cachedOriginalUrl !== undefined) {
-      await clickTracker.track(shortCode)
+      await recordClick(id, new Date())
       return cachedOriginalUrl
     }
 
-    const shortUrl = await shortenerRepository.findShortUrl(shortCode)
+    const shortUrl = await shortenerRepository.findShortUrl(id)
 
     if (!shortUrl) {
-      void shortenerCache.storeMissingShortCode(shortCode)
-      throw new NotFoundError('Short URL not found', 'SHORT_URL_NOT_FOUND')
+      await shortenerCache.storeMissingShortCode(shortCode)
+      throw shortUrlNotFound()
     }
 
-    if (shortUrl.quarantinedAt) {
-      const lastAccessedAt = new Date()
-      await shortenerRepository.recordClick({
-        shortCode,
-        count: 1,
-        lastAccessedAt,
-        expiresAt: new Date(
-          lastAccessedAt.getTime() +
-            runtimeConfig.urlRetentionDays * 24 * 60 * 60 * 1_000,
-        ),
-      })
-      void shortenerCache.storeOriginalUrl(shortCode, shortUrl.originalUrl)
-      return shortUrl.originalUrl
-    }
-
-    void shortenerCache.storeOriginalUrl(shortCode, shortUrl.originalUrl)
-    await clickTracker.track(shortCode)
-
+    await shortenerCache.storeOriginalUrl(shortCode, shortUrl.originalUrl)
+    await recordClick(id, new Date())
     return shortUrl.originalUrl
   },
 }

@@ -1,23 +1,66 @@
 import { describe, expect, it } from 'vitest'
-import { generateShortCode } from './short-code'
+import {
+  SHORT_CODE_CAPACITY,
+  ShortCodeCodec,
+} from './short-code'
 
-describe('generateShortCode', () => {
-  it('maps random indexes to an eight-character Base62 code', () => {
-    const indexes = [0, 9, 10, 35, 36, 61, 1, 60]
+const secret = 'short-code-secret-with-at-least-32-characters'
+const expectedCapacity = 62n ** 6n
 
-    const shortCode = generateShortCode(() => indexes.shift() ?? 0)
-
-    expect(shortCode).toBe('09AZaz1y')
+describe('ShortCodeCodec', () => {
+  it('exposes the complete six-character Base62 namespace', () => {
+    expect(SHORT_CODE_CAPACITY).toBe(expectedCapacity)
   })
 
-  it('requests exactly eight indexes from the 62-character alphabet', () => {
-    const requestedMaximums: number[] = []
+  it.each([1n, 2n, 62n ** 4n, 62n ** 5n, expectedCapacity])(
+    'round-trips database ID %s through canonical Base62',
+    (id) => {
+      const codec = new ShortCodeCodec(secret)
+      const shortCode = codec.encode(id)
 
-    generateShortCode((maximum) => {
-      requestedMaximums.push(maximum)
-      return 0
-    })
+      expect(shortCode).toMatch(/^[0-9A-Za-z]{4,6}$/)
+      expect(codec.decode(shortCode)).toBe(id)
+    },
+  )
 
-    expect(requestedMaximums).toEqual(Array(8).fill(62))
+  it('is deterministic for one secret and changes the mapping for another', () => {
+    const firstCodec = new ShortCodeCodec(secret)
+    const sameCodec = new ShortCodeCodec(secret)
+    const otherCodec = new ShortCodeCodec(
+      'another-short-code-secret-with-32-characters',
+    )
+    const ids = [1n, 2n, 3n, 10_000n]
+
+    expect(ids.map((id) => firstCodec.encode(id))).toEqual(
+      ids.map((id) => sameCodec.encode(id)),
+    )
+    expect(ids.map((id) => firstCodec.encode(id))).not.toEqual(
+      ids.map((id) => otherCodec.encode(id)),
+    )
+  })
+
+  it.each([0n, expectedCapacity + 1n])(
+    'rejects database ID %s outside the six-character namespace',
+    (id) => {
+      expect(() => new ShortCodeCodec(secret).encode(id)).toThrow(
+        /between 1 and 56800235584/,
+      )
+    },
+  )
+
+  it.each(['abc', 'abcdefg', 'ab-c', 'á123', '00000'])(
+    'rejects invalid or non-canonical shortcode %s',
+    (shortCode) => {
+      expect(() => new ShortCodeCodec(secret).decode(shortCode)).toThrow(
+        /shortcode/i,
+      )
+    },
+  )
+
+  it('accepts the canonical four-character representation at numeric zero', () => {
+    const codec = new ShortCodeCodec(secret)
+    const id = codec.decode('0000')
+
+    expect(codec.encode(id)).toBe('0000')
   })
 })

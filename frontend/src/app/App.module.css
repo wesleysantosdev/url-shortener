@@ -21,11 +21,22 @@
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   color: var(--graphite-ink);
-  font-size: 0.76rem;
-  font-weight: 750;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  font-family: 'Bricolage Grotesque Variable', sans-serif;
+  font-size: 1.45rem;
+  font-stretch: 90%;
+  font-weight: 680;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.brand img {
+  width: 2.4rem;
+  height: 2.4rem;
+  object-fit: contain;
 }
 
 .socialLinks {

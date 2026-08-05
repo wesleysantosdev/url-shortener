@@ -71,26 +71,3 @@ export class RateLimitUnavailableError extends AppError {
     })
   }
 }
-
-export class UrlCapacityReachedError extends AppError {
-  constructor() {
-    super({
-      statusCode: 503,
-      code: 'URL_CAPACITY_REACHED',
-      title: 'Service Unavailable',
-      detail: 'Short URL capacity has been reached',
-    })
-  }
-}
-
-export class ShortCodeGenerationError extends AppError {
-  constructor(cause?: unknown) {
-    super({
-      statusCode: 503,
-      code: 'SHORT_CODE_GENERATION_FAILED',
-      title: 'Service Unavailable',
-      detail: 'A unique short code could not be generated',
-      cause,
-    })
-  }
-}

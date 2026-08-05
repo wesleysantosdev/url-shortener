@@ -4,16 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ShortenerForm } from './ShortenerForm'
 
 const originalUrl = 'https://example.com/articles/a-long-path'
-const createdShortUrlResponse = {
-  message: 'Short URL created successfully',
-  data: {
-    id: '123e4567-e89b-42d3-a456-426614174000',
-    shortCode: 'aB3dE5g7',
-    originalUrl,
-    createdAt: '2026-08-03T12:00:00.000Z',
-    clicks: 0,
-  },
-}
+const createdShortUrlResponse = { shortUrl: 'http://localhost:5000/aB3d' }
 
 function jsonResponse(
   payload: unknown,
@@ -117,7 +108,7 @@ describe('ShortenerForm', () => {
 
     await enterAndSubmit(originalUrl)
     const shortLink = await screen.findByRole('link', {
-      name: 'http://localhost:5000/aB3dE5g7',
+      name: createdShortUrlResponse.shortUrl,
     })
 
     await user.type(screen.getByRole('textbox', { name: /long url/i }), '?edited')
@@ -128,12 +119,7 @@ describe('ShortenerForm', () => {
   it('adds a different shortcode when the same URL is submitted again', async () => {
     const user = userEvent.setup()
     const secondResponse = {
-      ...createdShortUrlResponse,
-      data: {
-        ...createdShortUrlResponse.data,
-        id: '223e4567-e89b-42d3-a456-426614174000',
-        shortCode: 'Z9y8X7w6',
-      },
+      shortUrl: 'http://localhost:5000/Z9y8',
     }
     vi.stubGlobal(
       'fetch',
@@ -149,12 +135,12 @@ describe('ShortenerForm', () => {
 
     expect(
       await screen.findByRole('link', {
-        name: 'http://localhost:5000/Z9y8X7w6',
+        name: secondResponse.shortUrl,
       }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('link', {
-        name: 'http://localhost:5000/aB3dE5g7',
+        name: createdShortUrlResponse.shortUrl,
       }),
     ).toBeInTheDocument()
     expect(screen.getAllByText(originalUrl)).toHaveLength(2)
@@ -162,15 +148,17 @@ describe('ShortenerForm', () => {
 
   it('restores validated results after the page reloads', () => {
     window.sessionStorage.setItem(
-      'short-url-history:v1',
-      JSON.stringify([createdShortUrlResponse.data]),
+      'short-url-history:v2',
+      JSON.stringify([
+        { shortUrl: createdShortUrlResponse.shortUrl, originalUrl },
+      ]),
     )
 
     render(<ShortenerForm />)
 
     expect(
       screen.getByRole('link', {
-        name: 'http://localhost:5000/aB3dE5g7',
+        name: createdShortUrlResponse.shortUrl,
       }),
     ).toBeInTheDocument()
     expect(screen.getByText(originalUrl)).toBeInTheDocument()
@@ -203,16 +191,7 @@ describe('ShortenerForm', () => {
     )
   })
 
-  it.each([
-    [
-      'RATE_LIMIT_UNAVAILABLE',
-      'Link creation is temporarily unavailable while abuse protection recovers. Try again shortly.',
-    ],
-    [
-      'URL_CAPACITY_REACHED',
-      'This shortener has reached its current capacity. Try again after inactive links are cleared.',
-    ],
-  ])('gives specific recovery guidance for %s', async (code, message) => {
+  it('gives specific recovery guidance when rate limiting is unavailable', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn<typeof fetch>().mockResolvedValue(
@@ -223,7 +202,7 @@ describe('ShortenerForm', () => {
             status: 503,
             detail: 'Short URL creation is temporarily unavailable',
             instance: '/api/v1/shortener',
-            code,
+            code: 'RATE_LIMIT_UNAVAILABLE',
           },
           503,
         ),
@@ -233,7 +212,18 @@ describe('ShortenerForm', () => {
 
     await enterAndSubmit(originalUrl)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Link creation is temporarily unavailable while abuse protection recovers. Try again shortly.',
+    )
+  })
+
+  it('does not display a visual history counter', async () => {
+    vi.stubGlobal('fetch', successfulFetch())
+    render(<ShortenerForm />)
+
+    await enterAndSubmit(originalUrl)
+
+    expect(screen.queryByText(/\d+\/5/)).not.toBeInTheDocument()
   })
 
   it('shows the normalized recovery message for network failures', async () => {

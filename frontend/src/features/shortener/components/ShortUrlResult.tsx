@@ -1,30 +1,25 @@
-import { useState } from 'react'
-import { runtimeConfig } from '../../../shared/config/runtime-config'
+import { useId, useState } from 'react'
 import styles from './ShortUrlResult.module.css'
 
 interface ShortUrlResultProps {
-  shortCode: string
+  shortUrl: string
   originalUrl?: string
   showStatus?: boolean
-  publicShortUrlBase?: string
 }
 
 type CopyState = 'idle' | 'copied' | 'error'
 
 export function ShortUrlResult({
-  shortCode,
+  shortUrl,
   originalUrl,
   showStatus = true,
-  publicShortUrlBase = runtimeConfig.publicShortUrlBase,
 }: ShortUrlResultProps) {
   const [copyState, setCopyState] = useState<CopyState>('idle')
-  const normalizedBaseUrl = publicShortUrlBase.replace(/\/$/, '')
-  const publicShortUrl = `${normalizedBaseUrl}/${encodeURIComponent(shortCode)}`
-  const titleId = `short-url-result-${shortCode}`
+  const titleId = useId()
 
   async function copyShortUrl() {
     try {
-      await navigator.clipboard.writeText(publicShortUrl)
+      await navigator.clipboard.writeText(shortUrl)
       setCopyState('copied')
     } catch {
       setCopyState('error')
@@ -47,16 +42,16 @@ export function ShortUrlResult({
       ) : null}
       <a
         className={styles.shortUrl}
-        href={publicShortUrl}
+        href={shortUrl}
         target="_blank"
         rel="noreferrer"
       >
-        {publicShortUrl}
+        {shortUrl}
       </a>
       <div className={styles.actions}>
         <a
           className={styles.openLink}
-          href={publicShortUrl}
+          href={shortUrl}
           target="_blank"
           rel="noreferrer"
         >

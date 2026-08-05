@@ -1,6 +1,5 @@
 import { FormEvent, useState } from 'react'
 import {
-  CreatedShortUrl,
   ShortenerApiError,
   createShortUrl,
 } from '../api/create-short-url'
@@ -9,6 +8,7 @@ import {
   addShortUrlToHistory,
   loadShortUrlHistory,
   saveShortUrlHistory,
+  ShortUrlHistoryEntry,
 } from '../api/short-url-history'
 import { ShortUrlHistory } from './ShortUrlHistory'
 import styles from './ShortenerForm.module.css'
@@ -41,10 +41,6 @@ function requestErrorMessage(error: unknown): string {
     return 'Link creation is temporarily unavailable while abuse protection recovers. Try again shortly.'
   }
 
-  if (error.code === 'URL_CAPACITY_REACHED') {
-    return 'This shortener has reached its current capacity. Try again after inactive links are cleared.'
-  }
-
   if (error.code === 'VALIDATION_ERROR') {
     return 'The server rejected this URL. Check it and try again.'
   }
@@ -57,7 +53,7 @@ export function ShortenerForm() {
   const [validationMessage, setValidationMessage] = useState<string>()
   const [submission, setSubmission] =
     useState<SubmissionState>(initialSubmissionState)
-  const [shortUrlHistory, setShortUrlHistory] = useState<CreatedShortUrl[]>(
+  const [shortUrlHistory, setShortUrlHistory] = useState<ShortUrlHistoryEntry[]>(
     loadShortUrlHistory,
   )
   const isPending = submission.status === 'pending'
@@ -91,9 +87,12 @@ export function ShortenerForm() {
 
     try {
       const shortUrl = await createShortUrl(parsedForm.data.url)
-      const nextHistory = addShortUrlToHistory(shortUrlHistory, shortUrl)
-      setShortUrlHistory(nextHistory)
-      saveShortUrlHistory(nextHistory)
+      const historyEntry = { shortUrl, originalUrl: parsedForm.data.url }
+      setShortUrlHistory((currentHistory) => {
+        const nextHistory = addShortUrlToHistory(currentHistory, historyEntry)
+        saveShortUrlHistory(nextHistory)
+        return nextHistory
+      })
       setSubmission({ status: 'success' })
     } catch (error: unknown) {
       setSubmission({ status: 'error', message: requestErrorMessage(error) })

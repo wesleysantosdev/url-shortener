@@ -3,33 +3,29 @@ import { loadRuntimeConfig } from './runtime'
 
 describe('loadRuntimeConfig', () => {
   const requiredEnvironment = {
-    CORS_ALLOWED_ORIGIN: 'http://localhost:5174',
+    CORS_ALLOWED_ORIGIN: 'http://localhost:5173',
+    PUBLIC_SHORT_URL_BASE: 'http://localhost:5000',
     RATE_LIMIT_IP_HASH_SECRET: 'a'.repeat(32),
+    SHORT_CODE_SECRET: 'b'.repeat(32),
   }
 
   it('provides the confirmed architecture defaults', () => {
     expect(loadRuntimeConfig(requiredEnvironment)).toEqual({
       redisUrl: 'redis://localhost:6379',
       redisCommandTimeoutMs: 100,
-      cacheEnabled: true,
       urlCacheTtlSeconds: 86_400,
       negativeCacheTtlSeconds: 60,
-      clickTrackingMode: 'async',
-      clickBatchSize: 500,
-      clickBatchIntervalMs: 5_000,
-      clickQueueMaxLength: 1_000_000,
-      corsAllowedOrigin: 'http://localhost:5174',
+      corsAllowedOrigin: 'http://localhost:5173',
+      publicShortUrlBase: 'http://localhost:5000',
       creationAttemptLimit: 5,
       creationAttemptWindowSeconds: 60,
       creationDailyLimit: 20,
       creationDailyWindowSeconds: 86_400,
-      maxActiveUrls: 100_000,
       rateLimitIpHashSecret: 'a'.repeat(32),
+      shortCodeSecret: 'b'.repeat(32),
       trustProxyHops: 0,
-      urlRetentionDays: 30,
-      urlDeletionGraceHours: 24,
+      urlRetentionDays: 180,
       urlCleanupIntervalHours: 24,
-      urlCleanupBatchSize: 1_000,
     })
   })
 
@@ -48,36 +44,24 @@ describe('loadRuntimeConfig', () => {
     ).toBe('https://shortener.example.com')
   })
 
-  it('parses the baseline benchmark configuration', () => {
+  it('normalizes a public short URL base with a path', () => {
     expect(
       loadRuntimeConfig({
         ...requiredEnvironment,
-        CACHE_ENABLED: 'false',
-        CLICK_TRACKING_MODE: 'sync',
-        REDIS_URL: 'redis://redis:6379',
-        CLICK_BATCH_SIZE: '100',
-        CORS_ALLOWED_ORIGIN: 'http://localhost:5174',
-      }),
-    ).toMatchObject({
-      cacheEnabled: false,
-      clickTrackingMode: 'sync',
-      redisUrl: 'redis://redis:6379',
-      clickBatchSize: 100,
-    })
+        PUBLIC_SHORT_URL_BASE: 'https://short.example.com/go/',
+      }).publicShortUrlBase,
+    ).toBe('https://short.example.com/go')
   })
 
   it.each([
-    ['CACHE_ENABLED', 'sometimes'],
-    ['CLICK_TRACKING_MODE', 'eventually'],
-    ['CLICK_BATCH_SIZE', '0'],
     ['REDIS_COMMAND_TIMEOUT_MS', '-1'],
     ['CORS_ALLOWED_ORIGIN', 'ftp://shortener.example.com'],
+    ['PUBLIC_SHORT_URL_BASE', 'ftp://short.example.com'],
+    ['PUBLIC_SHORT_URL_BASE', 'https://user:password@short.example.com'],
     ['CREATION_ATTEMPT_LIMIT', '0'],
     ['CREATION_DAILY_WINDOW_SECONDS', '1.5'],
-    ['MAX_ACTIVE_URLS', '-1'],
     ['TRUST_PROXY_HOPS', '-1'],
     ['URL_RETENTION_DAYS', '0'],
-    ['URL_CLEANUP_BATCH_SIZE', 'many'],
   ])('rejects invalid %s', (name, value) => {
     expect(() =>
       loadRuntimeConfig({ ...requiredEnvironment, [name]: value }),
@@ -92,9 +76,25 @@ describe('loadRuntimeConfig', () => {
       expect(() =>
         loadRuntimeConfig({
           CORS_ALLOWED_ORIGIN: 'http://localhost:5174',
+          PUBLIC_SHORT_URL_BASE: 'http://localhost:5000',
           RATE_LIMIT_IP_HASH_SECRET: value,
+          SHORT_CODE_SECRET: 'b'.repeat(32),
         }),
       ).toThrow('Invalid RATE_LIMIT_IP_HASH_SECRET')
+    },
+  )
+
+  it.each([undefined, '', 'short'])(
+    'requires a strong SHORT_CODE_SECRET (%s)',
+    (value) => {
+      expect(() =>
+        loadRuntimeConfig({
+          CORS_ALLOWED_ORIGIN: 'http://localhost:5174',
+          PUBLIC_SHORT_URL_BASE: 'http://localhost:5000',
+          RATE_LIMIT_IP_HASH_SECRET: 'a'.repeat(32),
+          SHORT_CODE_SECRET: value,
+        }),
+      ).toThrow('Invalid SHORT_CODE_SECRET')
     },
   )
 })

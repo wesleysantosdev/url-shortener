@@ -17,4 +17,4 @@ export type CreateShortUrlBody = z.infer<typeof createShortUrlBodySchema>
 
 export const shortCodeSchema = z
   .string()
-  .regex(/^[0-9A-Za-z]{8}$/)
+  .regex(/^[0-9A-Za-z]{4,6}$/)

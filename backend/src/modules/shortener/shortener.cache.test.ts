@@ -8,7 +8,6 @@ const redisMock = vi.hoisted(() => ({
 }))
 
 const runtimeConfigMock = vi.hoisted(() => ({
-  cacheEnabled: true,
   urlCacheTtlSeconds: 86_400,
   negativeCacheTtlSeconds: 60,
 }))
@@ -25,7 +24,6 @@ import shortenerCache from './shortener.cache'
 
 describe('shortenerCache', () => {
   beforeEach(() => {
-    runtimeConfigMock.cacheEnabled = true
     redisMock.get.mockResolvedValue(null)
     redisMock.set.mockResolvedValue('OK')
     redisMock.del.mockResolvedValue(1)
@@ -68,15 +66,6 @@ describe('shortenerCache', () => {
         error,
       }),
     )
-  })
-
-  it('does not access Redis when cache is disabled', async () => {
-    runtimeConfigMock.cacheEnabled = false
-
-    await expect(
-      shortenerCache.findOriginalUrl(shortCode),
-    ).resolves.toBeUndefined()
-    expect(redisMock.get).not.toHaveBeenCalled()
   })
 
   it('stores a valid URL for 24 hours', async () => {

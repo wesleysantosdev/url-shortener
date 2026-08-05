@@ -24,14 +24,14 @@ describe('shortener schemas', () => {
     )
   })
 
-  it.each(['aB3dE5g7', '00000000', 'ZZZZZZZZ'])(
-    'accepts an eight-character Base62 short code (%s)',
+  it.each(['aB3d', '0000', 'Z9y8X', 'ZZZZZZ'])(
+    'accepts a 4-6 character Base62 short code (%s)',
     (shortCode) => {
       expect(shortCodeSchema.safeParse(shortCode).success).toBe(true)
     },
   )
 
-  it.each(['abcdef0', 'abcdef0123456789', 'abcd-123', 'ábcdef12'])(
+  it.each(['abc', 'abcdef0', 'abcd-1', 'ábcdef'])(
     'rejects a non-contract short code (%s)',
     (shortCode) => {
       expect(shortCodeSchema.safeParse(shortCode).success).toBe(false)

@@ -5,8 +5,6 @@ import {
   DatabaseError,
   NotFoundError,
   RateLimitUnavailableError,
-  ShortCodeGenerationError,
-  UrlCapacityReachedError,
   ValidationError,
 } from './http-errors'
 
@@ -80,13 +78,11 @@ describe('HTTP application errors', () => {
     })
   })
 
-  it.each([
-    [new RateLimitUnavailableError(), 'RATE_LIMIT_UNAVAILABLE'],
-    [new UrlCapacityReachedError(), 'URL_CAPACITY_REACHED'],
-    [new ShortCodeGenerationError(), 'SHORT_CODE_GENERATION_FAILED'],
-  ])('creates operational service-unavailable errors', (error, code) => {
+  it('creates an operational rate-limit unavailable error', () => {
+    const error = new RateLimitUnavailableError()
+
     expect(error.statusCode).toBe(503)
-    expect(error.code).toBe(code)
+    expect(error.code).toBe('RATE_LIMIT_UNAVAILABLE')
     expect(error.isOperational).toBe(true)
   })
 })

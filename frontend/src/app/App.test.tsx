@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { App } from './App'
 
@@ -6,10 +6,25 @@ describe('App', () => {
   it('renders the accessible page shell in English', () => {
     render(<App />)
 
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
+    const navigation = screen.getByRole('navigation')
+
+    expect(navigation).toBeInTheDocument()
+    expect(within(navigation).getByText('shrten')).toBeInTheDocument()
+    expect(navigation.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('shrten-logo-icon.png'),
+    )
     expect(
       screen.getByRole('heading', { name: /make long links easier to carry/i }),
     ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Paste your long URL and get a short link, ready to copy and share',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText('Compact links, clear moves'),
+    ).not.toBeInTheDocument()
     expect(screen.getByRole('main')).toBeInTheDocument()
     expect(
       screen.getByRole('textbox', { name: /long url/i }),

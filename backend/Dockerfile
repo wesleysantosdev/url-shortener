@@ -17,16 +17,9 @@ ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
 COPY prisma.config.ts tsconfig.json tsconfig.build.json ./
 COPY prisma ./prisma
 COPY src ./src
-COPY scripts ./scripts
 
 RUN npx prisma generate
 RUN npm run build
-
-
-# Mantém as devDependencies, incluindo Autocannon, somente na imagem de ferramentas.
-FROM build AS tools
-
-CMD ["node", "dist/scripts/benchmark.js"]
 
 
 FROM node:24-alpine AS runtime

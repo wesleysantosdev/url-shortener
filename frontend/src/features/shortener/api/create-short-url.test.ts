@@ -5,16 +5,8 @@ import {
 } from './create-short-url'
 
 const originalUrl = 'https://example.com/articles/a-long-path'
-const createdShortUrlResponse = {
-  message: 'Short URL created successfully',
-  data: {
-    id: '123e4567-e89b-42d3-a456-426614174000',
-    shortCode: 'aB3dE5g7',
-    originalUrl,
-    createdAt: '2026-08-03T12:00:00.000Z',
-    clicks: 0,
-  },
-}
+const shortUrl = 'https://sho.rt/aB3d'
+const createdShortUrlResponse = { shortUrl }
 
 function jsonResponse(
   payload: unknown,
@@ -32,7 +24,7 @@ describe('createShortUrl', () => {
     vi.unstubAllGlobals()
   })
 
-  it('posts the URL and returns the complete validated record', async () => {
+  it('posts the URL and returns the validated public short URL', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValue(jsonResponse(createdShortUrlResponse, 201))
@@ -40,7 +32,7 @@ describe('createShortUrl', () => {
 
     await expect(
       createShortUrl(originalUrl, 'https://api.example.com'),
-    ).resolves.toEqual(createdShortUrlResponse.data)
+    ).resolves.toBe(shortUrl)
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.example.com/api/v1/shortener',
       {
@@ -108,8 +100,7 @@ describe('createShortUrl', () => {
       vi.fn<typeof fetch>().mockResolvedValue(
         jsonResponse(
           {
-            ...createdShortUrlResponse,
-            data: { ...createdShortUrlResponse.data, shortCode: 'wrong' },
+            shortUrl: 'not a public URL',
           },
           201,
         ),

@@ -5,7 +5,6 @@ import {
   shortCodeSchema,
 } from './shortener.schema'
 import shortenerService from './shortener.service'
-import { toCreatedShortUrlDto } from './shortener.type'
 import { creationRateLimiter } from './creation-rate-limiter'
 
 const shortenerController = {
@@ -21,19 +20,16 @@ const shortenerController = {
     }
 
     const reservation = await creationRateLimiter.reserveDaily(identity)
-    let createdUrl
+    let shortUrl
 
     try {
-      createdUrl = await shortenerService.createShortUrl(url)
+      shortUrl = await shortenerService.createShortUrl(url)
     } catch (error: unknown) {
       await creationRateLimiter.refundDaily(reservation)
       throw error
     }
 
-    return response.status(201).json({
-      message: 'Short URL created successfully',
-      data: toCreatedShortUrlDto(createdUrl),
-    })
+    return response.status(201).json({ shortUrl })
   },
 
   async redirectToOriginalUrl(

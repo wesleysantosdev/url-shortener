@@ -3,26 +3,22 @@ import { describe, expect, it } from 'vitest'
 
 const schema = readFileSync('prisma/schema.prisma', 'utf8')
 
-describe('Prisma governance schema', () => {
-  it('stores native UUID IDs and bounded short URL fields', () => {
-    expect(schema).toContain(
-      'id               String    @id @default(uuid()) @db.Uuid',
-    )
-    expect(schema).toContain('shortCode        String    @unique @db.VarChar(8)')
-    expect(schema).toContain('originalUrl      String    @db.VarChar(2048)')
+describe('Prisma URL schema', () => {
+  it('stores a generated BigInt ID and bounded original URL', () => {
+    expect(schema).toContain('id             BigInt   @id @default(autoincrement())')
+    expect(schema).toContain('originalUrl    String   @db.VarChar(2048)')
   })
 
-  it('indexes expiry and quarantine timestamps', () => {
-    expect(schema).toContain('lastAccessedAt   DateTime?')
-    expect(schema).toContain('expiresAt         DateTime')
-    expect(schema).toContain('quarantinedAt     DateTime?')
-    expect(schema).toContain('@@index([expiresAt])')
-    expect(schema).toContain('@@index([quarantinedAt])')
+  it('stores direct click and non-null activity state', () => {
+    expect(schema).toContain('clicks         Int      @default(0)')
+    expect(schema).toContain('lastAccessedAt DateTime @default(now())')
+    expect(schema).toContain('@@index([lastAccessedAt])')
   })
 
-  it('defines the singleton active URL counter', () => {
-    expect(schema).toContain('model UrlCapacity')
-    expect(schema).toContain("key         String   @id @default(\"global\")")
-    expect(schema).toContain('activeCount Int      @default(0)')
+  it('does not persist a derived code, quarantine, expiry, or capacity counter', () => {
+    expect(schema).not.toContain('shortCode')
+    expect(schema).not.toContain('expiresAt')
+    expect(schema).not.toContain('quarantinedAt')
+    expect(schema).not.toContain('model UrlCapacity')
   })
 })

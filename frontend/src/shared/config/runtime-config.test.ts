@@ -5,7 +5,6 @@ describe('parseRuntimeConfig', () => {
   it('uses local backend defaults when optional environment values are absent', () => {
     expect(parseRuntimeConfig({})).toEqual({
       apiBaseUrl: 'http://localhost:5000',
-      publicShortUrlBase: 'http://localhost:5000',
     })
   })
 
@@ -13,11 +12,9 @@ describe('parseRuntimeConfig', () => {
     expect(
       parseRuntimeConfig({
         VITE_API_BASE_URL: 'https://api.example.com/',
-        VITE_PUBLIC_SHORT_URL_BASE: 'https://go.example.com/',
       }),
     ).toEqual({
       apiBaseUrl: 'https://api.example.com',
-      publicShortUrlBase: 'https://go.example.com',
     })
   })
 

@@ -1,12 +1,17 @@
 import { z } from 'zod'
-import {
-  CreatedShortUrl,
-  createdShortUrlSchema,
-} from './create-short-url'
+import { absoluteHttpUrlSchema } from './create-short-url'
 
-const HISTORY_KEY = 'short-url-history:v1'
-const MAX_HISTORY_LENGTH = 20
-const historySchema = z.array(createdShortUrlSchema)
+const HISTORY_KEY = 'short-url-history:v2'
+const MAX_HISTORY_LENGTH = 5
+
+export const shortUrlHistoryEntrySchema = z.strictObject({
+  shortUrl: absoluteHttpUrlSchema,
+  originalUrl: absoluteHttpUrlSchema,
+})
+
+const historySchema = z.array(shortUrlHistoryEntrySchema)
+
+export type ShortUrlHistoryEntry = z.infer<typeof shortUrlHistoryEntrySchema>
 
 function availableSessionStorage(): Storage | undefined {
   try {
@@ -18,7 +23,7 @@ function availableSessionStorage(): Storage | undefined {
 
 export function loadShortUrlHistory(
   storage: Pick<Storage, 'getItem'> | undefined = availableSessionStorage(),
-): CreatedShortUrl[] {
+): ShortUrlHistoryEntry[] {
   if (!storage) {
     return []
   }
@@ -40,14 +45,14 @@ export function loadShortUrlHistory(
 }
 
 export function addShortUrlToHistory(
-  history: CreatedShortUrl[],
-  createdShortUrl: CreatedShortUrl,
-): CreatedShortUrl[] {
+  history: ShortUrlHistoryEntry[],
+  createdShortUrl: ShortUrlHistoryEntry,
+): ShortUrlHistoryEntry[] {
   return [createdShortUrl, ...history].slice(0, MAX_HISTORY_LENGTH)
 }
 
 export function saveShortUrlHistory(
-  history: CreatedShortUrl[],
+  history: ShortUrlHistoryEntry[],
   storage: Pick<Storage, 'setItem'> | undefined = availableSessionStorage(),
 ): void {
   try {

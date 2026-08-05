@@ -9,21 +9,11 @@ generator client {
 }
 
 model Url {
-  id               String    @id @default(uuid()) @db.Uuid
-  shortCode        String    @unique @db.VarChar(8)
-  originalUrl      String    @db.VarChar(2048)
-  createdAt        DateTime  @default(now())
-  clicks           Int       @default(0)
-  lastAccessedAt   DateTime?
-  expiresAt         DateTime
-  quarantinedAt     DateTime?
+  id             BigInt   @id @default(autoincrement())
+  originalUrl    String   @db.VarChar(2048)
+  createdAt      DateTime @default(now())
+  clicks         Int      @default(0)
+  lastAccessedAt DateTime @default(now())
 
-  @@index([expiresAt])
-  @@index([quarantinedAt])
-}
-
-model UrlCapacity {
-  key         String   @id @default("global")
-  activeCount Int      @default(0)
-  updatedAt   DateTime @updatedAt
+  @@index([lastAccessedAt])
 }

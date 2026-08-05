@@ -3,7 +3,7 @@ import { runtimeConfig } from './runtime'
 
 export const redis = new Redis(runtimeConfig.redisUrl, {
   commandTimeout: runtimeConfig.redisCommandTimeoutMs,
-  connectTimeout: runtimeConfig.redisCommandTimeoutMs,
+  connectTimeout: 10_000,
   enableOfflineQueue: false,
   maxRetriesPerRequest: 1,
   retryStrategy: (attempt) => Math.min(attempt * 100, 2_000),

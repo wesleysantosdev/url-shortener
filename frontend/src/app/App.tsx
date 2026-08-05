@@ -1,3 +1,4 @@
+import shrtenLogo from '../assets/shrten-logo-icon.png'
 import { ShortenerView } from '../features/shortener/views/ShortenerView'
 import { SocialLink } from './SocialLink'
 import styles from './App.module.css'
@@ -9,7 +10,10 @@ export function App() {
     <div className={styles.pageShell}>
       <header className={styles.header}>
         <nav className={styles.navigation} aria-label="Primary">
-          <span className={styles.brand}>Wesley Santos</span>
+          <span className={styles.brand}>
+            <img src={shrtenLogo} alt="" />
+            <span>shrten</span>
+          </span>
           <div className={styles.socialLinks}>
             <SocialLink
               network="LinkedIn"

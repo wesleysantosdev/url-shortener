@@ -1,8 +1,8 @@
 # URL Shortener Frontend
 
-Single-page React interface for the URL Shortener API.
+Interface React de página única para criar, copiar e abrir URLs encurtadas.
 
-## Local setup
+## Executar
 
 ```bash
 npm install
@@ -10,29 +10,34 @@ cp .env.example .env
 npm run dev
 ```
 
-Start the backend on `http://localhost:5000`. Its `backend/.env` file is the
-single source of truth for CORS. Set `CORS_ALLOWED_ORIGIN` to the exact origin
-printed by Vite, then restart the backend. For example:
+Inicie o backend em `http://localhost:5000` e configure nele
+`CORS_ALLOWED_ORIGIN` com a origem mostrada pelo Vite.
 
-```dotenv
-CORS_ALLOWED_ORIGIN=http://localhost:5173
-```
-
-If Vite selects another port, update only this value. Docker Compose passes it
-through without a fallback.
-
-## Environment
+## Ambiente
 
 ```dotenv
 VITE_API_BASE_URL=http://localhost:5000
-VITE_PUBLIC_SHORT_URL_BASE=http://localhost:5000
 ```
 
-`VITE_API_BASE_URL` is used for `POST /api/v1/shortener`.
-`VITE_PUBLIC_SHORT_URL_BASE` is used to construct the clickable redirect URL
-from the returned `shortCode`. They may differ in production.
+O backend devolve `shortUrl` completo, usando seu próprio
+`PUBLIC_SHORT_URL_BASE`. Assim o frontend não duplica a URL pública.
 
-## Quality commands
+## Histórico da aba
+
+O `sessionStorage` guarda apenas as cinco entradas mais recentes, no formato:
+
+```json
+{
+  "shortUrl": "https://short.ly/aB3d",
+  "originalUrl": "https://example.com/article"
+}
+```
+
+O histórico sobrevive a reloads da aba, mas desaparece quando a aba é fechada.
+Conteúdo alterado ou incompatível é descartado com validação Zod. Não existe
+contador visual.
+
+## Qualidade
 
 ```bash
 npm test
@@ -40,3 +45,6 @@ npm run lint
 npm run typecheck
 npm run build
 ```
+
+Leia `REACT_CONCEPTS.md` para uma explicação didática dos componentes, props,
+estado, hooks e decisões usadas nesta interface.

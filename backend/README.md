@@ -1,95 +1,105 @@
 # URL Shortener Backend
 
-Node.js and Express API for shortening URLs, built with TypeScript, Prisma,
-PostgreSQL, and Redis.
+API didática de encurtamento de URLs com Node.js, Express, TypeScript, Prisma,
+PostgreSQL e Redis. O projeto prioriza uma arquitetura pequena que ainda permite
+estudar separação de camadas, cache, rate limit e ciclo de vida dos dados.
 
-The API supports URL creation through `POST /api/v1/shortener`, public redirects
-through `GET /:shortCode`, Redis cache-aside reads, asynchronous click tracking
-with a Redis List and batch worker, a baseline mode without caching or queuing,
-and HTTP benchmarking with Autocannon.
+## Como funciona
 
-## Local setup
+1. `POST /api/v1/shortener` valida a URL e aplica rate limit por IP.
+2. PostgreSQL cria um `BIGINT` sequencial.
+3. O ID passa por uma permutação reversível baseada em `SHORT_CODE_SECRET`.
+4. O número embaralhado vira Base62 com 4 a 6 caracteres.
+5. A API devolve somente a URL pública completa.
+6. `GET /:shortCode` decodifica o ID, usa Redis como cache de leitura e responde
+   com redirecionamento `302`.
+7. Cada acesso incrementa `clicks` e atualiza `lastAccessedAt` diretamente.
+8. Uma rotina diária apaga URLs sem atividade por 180 dias.
 
-### Run everything with Docker
+O shortcode não é salvo no banco e não há consulta de colisão: IDs diferentes
+sempre produzem códigos diferentes dentro do espaço de `62^6` possibilidades.
+A transformação oculta a sequência, mas não é criptografia nem autenticação.
 
-```bash
-docker compose -p url-shortener --profile app up -d --build
-```
-
-### Run Node.js locally with Docker infrastructure
+## Executar com Docker
 
 ```bash
 cp .env.example .env
+docker compose up -d --build
+```
+
+O Compose inicia somente PostgreSQL, Redis e API. A API aplica migrations antes
+de iniciar o servidor.
+
+```bash
+docker compose ps
+docker compose logs -f api
+docker compose down
+```
+
+## Executar Node.js localmente
+
+```bash
 npm install
-docker compose -p url-shortener up -d
+docker compose up -d shortener-db redis
 npx prisma generate
 npx prisma migrate deploy
+npm run dev
 ```
 
-Start the API and worker in separate terminals:
+## Variáveis principais
+
+- `DATABASE_URL`: conexão PostgreSQL.
+- `REDIS_URL`: conexão Redis.
+- `CORS_ALLOWED_ORIGIN`: origem exata do frontend.
+- `PUBLIC_SHORT_URL_BASE`: prefixo devolvido ao usuário, como
+  `https://short.ly`.
+- `SHORT_CODE_SECRET`: secret estável com pelo menos 32 caracteres. Alterá-la
+  quebra a decodificação dos links existentes.
+- `RATE_LIMIT_IP_HASH_SECRET`: secret diferente para anonimizar IPs.
+- `URL_RETENTION_DAYS`: padrão de 180 dias.
+
+Veja todos os valores em `.env.example`. Em produção, use secrets aleatórias e
+um gerenciador de segredos.
+
+Ao alterar uma variável usada pela API, recrie o container para que o Compose
+carregue o novo valor:
 
 ```bash
-npm run dev:optimized
-npm run worker
+docker compose -p url-shortener up -d --no-deps --force-recreate api
 ```
 
-## Environment
-
-The backend `.env` file is the single source of truth for CORS. Set
-`CORS_ALLOWED_ORIGIN` to the exact frontend origin before starting or recreating
-the API. For example:
-
-```dotenv
-CORS_ALLOWED_ORIGIN=http://localhost:5173
-```
-
-After changing this value, restart the local API or recreate only the Docker
-Compose API service so the container receives the updated environment:
-
-```bash
-docker compose -p url-shortener --profile app up -d --no-deps --force-recreate api
-```
-
-Anonymous creation is protected by Redis-backed rolling limits. Set
-`RATE_LIMIT_IP_HASH_SECRET` to at least 32 random characters. The default
-deployment trusts no forwarded address; set `TRUST_PROXY_HOPS` to the exact
-number of reverse proxies in front of Express before using client IP limits
-behind a proxy. Never enable arbitrary proxy trust.
-
-The default policy permits 5 attempts per minute and 20 successful creations per
-rolling 24 hours for each anonymized IP, with a global capacity of 100,000 active
-or quarantined links. All values are documented in `.env.example`.
-
-## API usage
-
-Create a short URL:
+## Contrato HTTP
 
 ```bash
 curl -X POST http://localhost:5000/api/v1/shortener \
   -H 'Content-Type: application/json' \
-  -d '{"url":"https://example.com"}'
+  -d '{"url":"https://example.com/test"}'
 ```
 
-Open the returned short code:
-
-```bash
-curl -i http://localhost:5000/YOUR_SHORT_CODE
+```json
+{
+  "shortUrl": "http://localhost:5000/aB3d"
+}
 ```
 
-## Development commands
+O link retornado responde `302`. Falhas usam `application/problem+json` com um
+`code` estável para o cliente.
 
-```bash
-npm run dev
-npm run dev:optimized
-npm run dev:baseline
-npm run worker
-npm run benchmark
-```
+## Rate limit
 
-## Quality commands
+Redis mantém duas janelas móveis por IP anonimizado:
+
+- 5 tentativas válidas por minuto;
+- 20 criações bem-sucedidas por 24 horas.
+
+Se Redis estiver indisponível, a criação falha fechada para não perder a proteção.
+Redirecionamentos continuam consultando PostgreSQL quando o cache falha.
+
+## Qualidade
 
 ```bash
 npm test
 npm run typecheck
 npm run build
+npx prisma validate
 ```
