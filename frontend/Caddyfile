@@ -1,0 +1,35 @@
+www.{$PRIMARY_DOMAIN:shrten.pro} {
+	redir https://{$PRIMARY_DOMAIN:shrten.pro}{uri} permanent
+}
+
+{$PRIMARY_DOMAIN:shrten.pro} {
+	encode zstd gzip
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy api:5000
+	}
+
+	@shortCode path_regexp shortCode ^/[0-9A-Za-z]{4,6}$
+	handle @shortCode {
+		reverse_proxy api:5000
+	}
+
+	handle {
+		root * /srv
+
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
