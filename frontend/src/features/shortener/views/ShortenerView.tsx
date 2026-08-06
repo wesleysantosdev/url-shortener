@@ -9,7 +9,8 @@ export function ShortenerView() {
 
       <div className={styles.intro}>
         <h1 id="shortener-title" className={styles.title}>
-          Make long links <span>easier to carry.</span>
+          Make long links{' '}
+          <span className={styles.titleLine}>easier to carry</span>
         </h1>
         <p className={styles.description}>
           Paste your long URL and get a short link, ready to copy and share

@@ -71,10 +71,11 @@
     box-shadow 160ms ease;
 }
 
-.submitButton:hover:not(:disabled) {
+.submitButton:hover:not(:disabled),
+.submitButton:focus-visible:not(:disabled) {
   background: #4f2c7c;
   box-shadow: 0 0.5rem 1rem rgb(94 56 141 / 24%);
-  transform: translateY(-1px);
+  animation: buttonCompression 680ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 .submitButton:disabled {
@@ -98,6 +99,17 @@
   font-weight: 700;
 }
 
+@keyframes buttonCompression {
+  0%,
+  100% {
+    transform: translateY(-1px) scaleX(1);
+  }
+
+  52% {
+    transform: translateY(-1px) scaleX(0.78);
+  }
+}
+
 @media (max-width: 40rem) {
   .controlRow {
     grid-template-columns: minmax(0, 1fr);
@@ -116,5 +128,10 @@
   .controlRow,
   .submitButton {
     transition: none;
+  }
+
+  .submitButton:hover:not(:disabled),
+  .submitButton:focus-visible:not(:disabled) {
+    animation: none;
   }
 }
