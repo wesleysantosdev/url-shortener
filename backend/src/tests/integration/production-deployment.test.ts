@@ -34,8 +34,12 @@ describe('production deployment', () => {
   const api = composeService(compose, 'api')
   const web = composeService(compose, 'web')
 
-  it('publishes only the HTTP and HTTPS entrypoint', () => {
-    expect(database).not.toContain('ports:')
+  it('publishes the database only on the VPS loopback for SSH tunnels', () => {
+    expect(database).toContain('"127.0.0.1:15432:5432"')
+    expect(database).not.toContain('"0.0.0.0:15432:5432"')
+    expect(database).not.toContain('- "5432:5432"')
+    expect(database).toMatch(/networks:\n\s+private:\n\s+dbeaver:/)
+    expect(compose).toMatch(/networks:\n(?:.|\n)*\n  dbeaver:\n/)
     expect(redis).not.toContain('ports:')
     expect(api).not.toContain('ports:')
     expect(web).toContain('"80:80"')
@@ -97,5 +101,28 @@ describe('production deployment', () => {
     expect(backupScript).toContain('RETENTION_DAYS')
     expect(backupTimer).toContain('OnCalendar=')
     expect(backupTimer).toContain('Persistent=true')
+  })
+
+  it('validates main and deploys only an approved main commit', () => {
+    const workflow = repositoryFile('.github/workflows/ci-cd.yml')
+    const deployScript = repositoryFile('ops/deploy.sh')
+
+    expect(workflow).toContain('pull_request:')
+    expect(workflow).toContain('push:')
+    expect(workflow).toMatch(/branches:\s*\[main\]/)
+    expect(workflow).toContain('npm test')
+    expect(workflow).toContain('npm run typecheck')
+    expect(workflow).toContain('npm run lint')
+    expect(workflow).toContain("github.ref == 'refs/heads/main'")
+    expect(workflow).toContain('needs: validate')
+    expect(workflow).toContain('environment: production')
+    expect(workflow).toContain('secrets.VPS_SSH_PRIVATE_KEY')
+    expect(workflow).toContain('secrets.VPS_KNOWN_HOSTS')
+    expect(workflow).toContain("--exclude='.env.*'")
+    expect(workflow).toContain('ops/backup-postgres.sh')
+    expect(workflow).toContain('ops/deploy.sh')
+    expect(workflow).not.toContain('appleboy/')
+    expect(deployScript).toContain('docker compose')
+    expect(deployScript).toContain('up -d --build --remove-orphans')
   })
 })

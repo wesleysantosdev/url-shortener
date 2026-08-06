@@ -75,7 +75,7 @@ Proteções configuradas no servidor:
 - UFW ativo e limitando tentativas na porta 22;
 - fail2ban monitorando o SSH;
 - atualizações automáticas de segurança habilitadas;
-- somente uma chave presente em `authorized_keys` no momento do deploy.
+- duas chaves em `authorized_keys`: uma pessoal e outra exclusiva do CI/CD.
 
 Portanto, qualquer pessoa pode alcançar o serviço SSH enquanto a porta 22
 estiver pública, mas não consegue entrar apenas conhecendo o IP ou o alias. Ela
@@ -95,8 +95,10 @@ somente o backend:
 | `frontend/Dockerfile` | Build Vite e imagem final do Caddy |
 | `frontend/Caddyfile` | HTTPS, frontend, proxy da API e redirects curtos |
 | `ops/backup-postgres.sh` | Criação e retenção dos dumps do PostgreSQL |
+| `ops/deploy.sh` | Validação e atualização segura dos containers |
 | `ops/shrten-backup.service` | Execução do backup pelo systemd |
 | `ops/shrten-backup.timer` | Agendamento diário do backup |
+| `.github/workflows/ci-cd.yml` | Testes e deploy automático da `main` |
 
 `ops` significa *operations*. A pasta contém automações de operação da aplicação
 completa, como backup e integração com o sistema operacional. Colocá-la dentro
@@ -136,6 +138,13 @@ Para conferir uma regra sem mostrar o conteúdo do arquivo:
 git check-ignore -v .env.production
 ```
 
+Não execute `docker compose config` sem `--quiet` na VPS: a saída expandida
+inclui os valores de ambiente. Para validar somente a configuração, use:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.production.yml config --quiet
+```
+
 ## Caddy e HTTPS
 
 O Caddy é a única entrada HTTP da VPS. Ele:
@@ -173,7 +182,99 @@ Para reiniciar um serviço específico:
 docker compose --env-file .env.production -f docker-compose.production.yml restart api
 ```
 
-## Atualização da aplicação
+## DBeaver por túnel SSH
+
+O PostgreSQL é publicado somente no loopback da VPS:
+
+```text
+127.0.0.1:15432 -> container PostgreSQL:5432
+```
+
+A porta `15432` não deve ser aberta na Security List da Oracle nem no UFW. No
+DBeaver, crie uma conexão PostgreSQL com:
+
+**Main**
+
+- Host: `127.0.0.1`;
+- Port: `15432`;
+- Database: `shrten`;
+- Username: `shrten`;
+- Password: valor atual de `POSTGRES_PASSWORD`.
+
+**SSH**
+
+- Host: `147.15.69.77`;
+- Port: `22`;
+- User: `ubuntu`;
+- Authentication: `Public Key`;
+- Private key: `~/.ssh/id_ed25519_oracle_vm`.
+
+Consulte a senha somente no seu terminal:
+
+```bash
+ssh oracle-vm "grep '^POSTGRES_PASSWORD=' /opt/apps/shrten/.env.production"
+```
+
+Não salve essa senha no repositório ou em capturas de tela.
+
+## CI/CD com GitHub Actions
+
+O workflow `.github/workflows/ci-cd.yml` valida pull requests para `main` e
+executa o deploy somente em `push` ou execução manual na própria `main`.
+
+O job de validação executa:
+
+- instalação reproduzível com `npm ci`;
+- testes, typecheck e build do backend;
+- lint, typecheck, testes e build do frontend.
+
+Depois da validação, o job de produção:
+
+1. conecta com uma chave SSH exclusiva;
+2. cria um backup do PostgreSQL;
+3. sincroniza exatamente o commit aprovado sem copiar `.env`;
+4. constrói as imagens ARM64 na VPS;
+5. aplica migrações e aguarda os health checks;
+6. registra o SHA em `/opt/apps/shrten/REVISION`;
+7. valida publicamente `https://shrten.pro`.
+
+A chave exclusiva está em
+`~/.ssh/id_ed25519_oracle_vm_github_actions`, fora do repositório. Sua chave
+pública já está autorizada na VPS.
+
+Crie no GitHub, em **Settings > Secrets and variables > Actions**, estes
+Repository Secrets:
+
+| Secret | Valor |
+| --- | --- |
+| `VPS_HOST` | `147.15.69.77` |
+| `VPS_USER` | `ubuntu` |
+| `VPS_SSH_PRIVATE_KEY` | conteúdo da chave privada exclusiva do Actions |
+| `VPS_KNOWN_HOSTS` | chave pública de host SSH verificada da VPS |
+
+Copie a chave privada para o secret sem imprimi-la em logs compartilhados:
+
+```bash
+cat ~/.ssh/id_ed25519_oracle_vm_github_actions
+```
+
+Gere o valor de host conhecido:
+
+```bash
+ssh-keyscan -H -t ed25519 147.15.69.77
+```
+
+Crie também o environment `production` em **Settings > Environments** e limite
+suas deployment branches à `main`. Se o plano do GitHub oferecer required
+reviewers para o repositório, uma aprovação manual pode ser exigida antes do
+deploy.
+
+O primeiro deploy automático só deve ocorrer depois de todas as mudanças serem
+commitadas em `development`, validadas por pull request e mescladas em `main`.
+Nunca faça deploy da `main` atual antes desse merge, pois ela ainda contém apenas
+o commit inicial.
+
+## Atualização manual de emergência
 
 Na máquina de desenvolvimento, envie os arquivos sem copiar credenciais ou
 artefatos locais:
@@ -198,8 +299,8 @@ Depois, reconstrua e aplique a nova versão:
 ```bash
 ssh oracle-vm
 cd /opt/apps/shrten
-docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
-docker compose --env-file .env.production -f docker-compose.production.yml ps
+./ops/backup-postgres.sh
+./ops/deploy.sh
 ```
 
 O container da API executa `prisma migrate deploy` antes de iniciar o servidor.
@@ -253,7 +354,7 @@ projeto continuam privados.
 
 ## Validações realizadas
 
-- backend: 127 testes, typecheck e build aprovados;
+- backend: 128 testes, typecheck e build aprovados;
 - frontend: lint, typecheck, 42 testes e build aprovados;
 - imagens de produção construídas em ARM64 na VPS;
 - PostgreSQL, Redis e API saudáveis;
