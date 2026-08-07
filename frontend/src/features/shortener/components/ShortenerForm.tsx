@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import {
   ShortenerApiError,
   createShortUrl,
@@ -8,7 +9,7 @@ import {
   addShortUrlToHistory,
   loadShortUrlHistory,
   saveShortUrlHistory,
-  ShortUrlHistoryEntry,
+  type ShortUrlHistoryEntry,
 } from '../api/short-url-history'
 import { ShortUrlHistory } from './ShortUrlHistory'
 import styles from './ShortenerForm.module.css'

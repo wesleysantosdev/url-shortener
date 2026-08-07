@@ -1,4 +1,4 @@
-import { ShortUrlHistoryEntry } from '../api/short-url-history'
+import type { ShortUrlHistoryEntry } from '../api/short-url-history'
 import { ShortUrlResult } from './ShortUrlResult'
 import styles from './ShortUrlHistory.module.css'
 
