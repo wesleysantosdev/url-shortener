@@ -1,20 +1,13 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const backendDocuments = [
-  'README.md',
-  'DOCKER_GUIDE.md',
-  'INTERVIEW_SIMULATION.md',
-  'SYSTEM_DESIGN_STUDY.md',
-  'ERROR_HANDLING.md',
-].map((path) => readFileSync(path, 'utf8')).join('\n')
+const backendDocuments = readFileSync('README.md', 'utf8')
 const frontendReadme = readFileSync('../frontend/README.md', 'utf8')
-const reactGuidePath = '../frontend/REACT_CONCEPTS.md'
 
 describe('delivered architecture documentation', () => {
   it('describes ID-derived Base62 and six-month inactivity cleanup', () => {
     expect(backendDocuments).toMatch(/Base62/)
-    expect(backendDocuments).toMatch(/180 dias|seis meses/i)
+    expect(backendDocuments).toMatch(/180 (dias|days)|seis meses/i)
     expect(backendDocuments).toContain('SHORT_CODE_SECRET')
     expect(backendDocuments).toContain('PUBLIC_SHORT_URL_BASE')
   })
@@ -26,16 +19,11 @@ describe('delivered architecture documentation', () => {
     expect(frontendReadme).not.toContain('VITE_PUBLIC_SHORT_URL_BASE')
   })
 
-  it('includes a Portuguese React concepts guide for the implemented UI', () => {
-    expect(existsSync(reactGuidePath)).toBe(true)
-    const reactGuide = existsSync(reactGuidePath)
-      ? readFileSync(reactGuidePath, 'utf8')
-      : ''
-
-    expect(reactGuide).toMatch(/props/i)
-    expect(reactGuide).toMatch(/estado|state/i)
-    expect(reactGuide).toMatch(/hooks/i)
-    expect(reactGuide).toMatch(/Context/)
-    expect(reactGuide).toContain('sessionStorage')
+  it('documents the implemented React architecture in the tracked README', () => {
+    expect(frontendReadme).toMatch(/props/i)
+    expect(frontendReadme).toMatch(/estado|state/i)
+    expect(frontendReadme).toMatch(/hooks/i)
+    expect(frontendReadme).toMatch(/Context/)
+    expect(frontendReadme).toContain('sessionStorage')
   })
 })

@@ -113,6 +113,10 @@ describe('production deployment', () => {
     expect(workflow).toContain('npm test')
     expect(workflow).toContain('npm run typecheck')
     expect(workflow).toContain('npm run lint')
+    expect(workflow).toContain('npx prisma generate')
+    expect(workflow).toContain(
+      'DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci',
+    )
     expect(workflow).toContain("github.ref == 'refs/heads/main'")
     expect(workflow).toContain('needs: validate')
     expect(workflow).toContain('environment: production')

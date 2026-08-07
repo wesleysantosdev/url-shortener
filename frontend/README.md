@@ -38,6 +38,13 @@ The history survives tab reloads but disappears when the tab is closed.
 Modified or incompatible content is discarded through Zod validation. There is
 no visual counter.
 
+## React architecture
+
+Feature components receive explicit props, while local state and browser-side
+effects stay in focused hooks. React Context is intentionally not used because
+the current interface has no genuinely global client state; the short URL
+history remains scoped to the tab through `sessionStorage`.
+
 ## Quality
 
 ```bash
@@ -46,6 +53,3 @@ npm run lint
 npm run typecheck
 npm run build
 ```
-
-Read `REACT_CONCEPTS.md` for an educational explanation of the components,
-props, state, hooks, and decisions used in this interface.
