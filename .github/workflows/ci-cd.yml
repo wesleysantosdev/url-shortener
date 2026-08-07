@@ -31,8 +31,11 @@ jobs:
 
       - name: Validate backend
         working-directory: backend
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
         run: |
           npm ci
+          npx prisma generate
           npm test
           npm run typecheck
           npm run build

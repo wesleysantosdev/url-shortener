@@ -2,7 +2,14 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConflictError } from '../../shared/errors'
 
-const createShortUrlMock = vi.hoisted(() => vi.fn())
+const { createShortUrlMock, rateLimiterMock } = vi.hoisted(() => ({
+  createShortUrlMock: vi.fn(),
+  rateLimiterMock: {
+    consumeAttempt: vi.fn(),
+    reserveDaily: vi.fn(),
+    refundDaily: vi.fn(),
+  },
+}))
 
 vi.mock('../../modules/shortener/shortener.service', () => ({
   default: {
@@ -10,11 +17,22 @@ vi.mock('../../modules/shortener/shortener.service', () => ({
   },
 }))
 
+vi.mock('../../modules/shortener/creation-rate-limiter', () => ({
+  creationRateLimiter: rateLimiterMock,
+}))
+
 import { app } from '../../app'
 
 describe('application error pipeline', () => {
   beforeEach(() => {
     createShortUrlMock.mockResolvedValue({})
+    rateLimiterMock.consumeAttempt.mockResolvedValue({ remaining: 4 })
+    rateLimiterMock.reserveDaily.mockResolvedValue({
+      key: 'daily-key',
+      member: 'reservation-id',
+      remaining: 19,
+    })
+    rateLimiterMock.refundDaily.mockResolvedValue(undefined)
   })
 
   it('returns 400 Problem Details for malformed JSON', async () => {
