@@ -12,12 +12,16 @@ export function ShortUrlHistory({ shortUrls }: ShortUrlHistoryProps) {
   }
 
   return (
-    <section className={styles.history} aria-labelledby="session-routes-title">
+    <section className={styles.history} aria-labelledby="session-links-title">
       <div className={styles.headingRow}>
-        <h2 className={styles.heading} id="session-routes-title">
-          Session routes
+        <h2 className={styles.heading} id="session-links-title">
+          Session links
         </h2>
       </div>
+      <p className={styles.sessionNotice}>
+        <strong>Keep a copy of these links.</strong> This list clears when you
+        close this tab, but the links stay active.
+      </p>
       <ol className={styles.list}>
         {shortUrls.map((shortUrl) => (
           <li className={styles.item} key={shortUrl.shortUrl}>

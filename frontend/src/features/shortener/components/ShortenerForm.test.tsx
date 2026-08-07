@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ShortenerForm } from './ShortenerForm'
@@ -45,6 +45,7 @@ describe('ShortenerForm', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -99,6 +100,41 @@ describe('ShortenerForm', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Short link ready.',
     )
+  })
+
+  it('hides the ready announcement after a short delay', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', successfulFetch())
+    render(<ShortenerForm />)
+
+    fireEvent.change(screen.getByRole('textbox', { name: /long url/i }), {
+      target: { value: originalUrl },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Shorten' }))
+    await act(async () => {})
+
+    expect(screen.getByRole('status')).toHaveTextContent('Short link ready.')
+
+    await act(() => vi.advanceTimersByTimeAsync(2_000))
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('warns that session links must be kept after creating one', async () => {
+    vi.stubGlobal('fetch', successfulFetch())
+    render(<ShortenerForm />)
+
+    expect(screen.queryByText(/this list clears/i)).not.toBeInTheDocument()
+
+    await enterAndSubmit(originalUrl)
+
+    expect(
+      await screen.findByText(/this list clears when you close this tab/i),
+    ).toHaveTextContent(
+      'Keep a copy of these links. This list clears when you close this tab, but the links stay active.',
+    )
+    expect(screen.getByRole('heading', { name: 'Session links' })).toBeInTheDocument()
+    expect(screen.getByText('Saved')).toBeInTheDocument()
   })
 
   it('keeps previous session results when the original URL changes', async () => {

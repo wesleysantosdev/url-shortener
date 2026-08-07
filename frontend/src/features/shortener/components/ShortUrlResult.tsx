@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import styles from './ShortUrlResult.module.css'
 
 interface ShortUrlResultProps {
@@ -9,6 +9,8 @@ interface ShortUrlResultProps {
 
 type CopyState = 'idle' | 'copied' | 'error'
 
+const COPY_CONFIRMATION_DURATION_MS = 2_000
+
 export function ShortUrlResult({
   shortUrl,
   originalUrl,
@@ -16,6 +18,19 @@ export function ShortUrlResult({
 }: ShortUrlResultProps) {
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const titleId = useId()
+
+  useEffect(() => {
+    if (copyState !== 'copied') {
+      return
+    }
+
+    const resetCopyState = window.setTimeout(
+      () => setCopyState('idle'),
+      COPY_CONFIRMATION_DURATION_MS,
+    )
+
+    return () => window.clearTimeout(resetCopyState)
+  }, [copyState])
 
   async function copyShortUrl() {
     try {
@@ -33,7 +48,7 @@ export function ShortUrlResult({
         id={titleId}
         role={showStatus ? 'status' : undefined}
       >
-        {showStatus ? 'Short link ready.' : 'Saved route'}
+        {showStatus ? 'Short link ready.' : 'Saved'}
       </p>
       {originalUrl ? (
         <p className={styles.originalUrl} title={originalUrl}>
@@ -62,7 +77,7 @@ export function ShortUrlResult({
           type="button"
           onClick={copyShortUrl}
         >
-          {copyState === 'copied' ? 'Copied' : 'Copy link'}
+          {copyState === 'copied' ? 'Copied!' : 'Copy link'}
         </button>
       </div>
       {copyState === 'error' ? (

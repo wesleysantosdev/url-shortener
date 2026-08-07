@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import {
   ShortenerApiError,
   createShortUrl,
@@ -20,6 +20,7 @@ type SubmissionState =
   | { status: 'error'; message: string }
 
 const initialSubmissionState: SubmissionState = { status: 'idle' }
+const SUCCESS_MESSAGE_DURATION_MS = 2_000
 
 function requestErrorMessage(error: unknown): string {
   if (!(error instanceof ShortenerApiError)) {
@@ -57,6 +58,19 @@ export function ShortenerForm() {
     loadShortUrlHistory,
   )
   const isPending = submission.status === 'pending'
+
+  useEffect(() => {
+    if (submission.status !== 'success') {
+      return
+    }
+
+    const hideSuccessMessage = window.setTimeout(
+      () => setSubmission(initialSubmissionState),
+      SUCCESS_MESSAGE_DURATION_MS,
+    )
+
+    return () => window.clearTimeout(hideSuccessMessage)
+  }, [submission.status])
 
   function changeOriginalUrl(nextOriginalUrl: string) {
     setOriginalUrl(nextOriginalUrl)
