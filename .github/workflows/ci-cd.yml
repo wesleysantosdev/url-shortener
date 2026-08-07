@@ -94,7 +94,6 @@ jobs:
       - name: Upload approved commit
         run: |
           rsync -az --delete \
-            --include='.env.production.example' \
             --include='*/.env.example' \
             --exclude='.git/' \
             --exclude='node_modules/' \

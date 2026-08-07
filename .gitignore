@@ -5,4 +5,7 @@ specs/
 .env
 .env.*
 !.env.example
-!.env.production.example
+
+# Local production references
+.env.production.example
+DEPLOYMENT.md
