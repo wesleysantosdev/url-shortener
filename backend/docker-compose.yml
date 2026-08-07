@@ -1,0 +1,78 @@
+services:
+  shortener-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: shortener_db
+    ports:
+      - "3001:5432"
+    volumes:
+      - shortener-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d shortener_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - shortener-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    image: url-shortener-app:local
+    build:
+      context: .
+      target: runtime
+    environment:
+      DATABASE_URL: postgresql://admin:12345@shortener-db:5432/shortener_db
+      REDIS_URL: redis://redis:6379
+      REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-100}
+      REDIS_URL_CACHE_TTL_SECONDS: ${REDIS_URL_CACHE_TTL_SECONDS:-86400}
+      REDIS_NEGATIVE_CACHE_TTL_SECONDS: ${REDIS_NEGATIVE_CACHE_TTL_SECONDS:-60}
+      CORS_ALLOWED_ORIGIN: ${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN in backend/.env}
+      PUBLIC_SHORT_URL_BASE: ${PUBLIC_SHORT_URL_BASE:?Set PUBLIC_SHORT_URL_BASE in backend/.env}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
+      RATE_LIMIT_IP_HASH_SECRET: ${RATE_LIMIT_IP_HASH_SECRET:?Set RATE_LIMIT_IP_HASH_SECRET in backend/.env}
+      SHORT_CODE_SECRET: ${SHORT_CODE_SECRET:?Set SHORT_CODE_SECRET in backend/.env}
+      CREATION_ATTEMPT_LIMIT: ${CREATION_ATTEMPT_LIMIT:-5}
+      CREATION_ATTEMPT_WINDOW_SECONDS: ${CREATION_ATTEMPT_WINDOW_SECONDS:-60}
+      CREATION_DAILY_LIMIT: ${CREATION_DAILY_LIMIT:-20}
+      CREATION_DAILY_WINDOW_SECONDS: ${CREATION_DAILY_WINDOW_SECONDS:-86400}
+      URL_RETENTION_DAYS: ${URL_RETENTION_DAYS:-180}
+      URL_CLEANUP_INTERVAL_HOURS: ${URL_CLEANUP_INTERVAL_HOURS:-24}
+      PORT: 5000
+    command:
+      - sh
+      - -c
+      - npx prisma migrate deploy && node dist/src/server.js
+    ports:
+      - "${APP_PORT:-5000}:5000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const net=require('node:net');const socket=net.connect(5000,'127.0.0.1');socket.on('connect',()=>{socket.end();process.exit(0)});socket.on('error',()=>process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      shortener-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  shortener-db-data:
+  shortener-redis-data:

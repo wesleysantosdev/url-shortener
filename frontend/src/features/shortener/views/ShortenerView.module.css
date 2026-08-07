@@ -1,0 +1,150 @@
+.hero {
+  position: relative;
+  display: grid;
+  align-content: center;
+  width: min(100%, 82rem);
+  min-height: 38rem;
+  margin-inline: auto;
+  padding: clamp(3rem, 8vw, 6.5rem) 1.5rem clamp(4rem, 8vw, 6rem);
+  isolation: isolate;
+}
+
+.intro {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 58rem);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  color: var(--graphite-ink);
+  font-family: 'Bricolage Grotesque Variable', sans-serif;
+  font-size: clamp(3.25rem, 8vw, 6.75rem);
+  font-stretch: 90%;
+  font-weight: 680;
+  letter-spacing: -0.052em;
+  line-height: 0.88;
+  text-wrap: balance;
+  word-spacing: 0.04em;
+  animation: riseIn 620ms 70ms ease-out both;
+}
+
+.titleLine {
+  display: block;
+  width: fit-content;
+  margin-inline: auto;
+  color: var(--deep-violet);
+  transform-origin: center;
+  animation: phraseCompression 5s 1.1s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.description {
+  width: min(100%, 34rem);
+  margin: 1.5rem auto 0;
+  color: #655d6c;
+  font-size: clamp(1rem, 2vw, 1.13rem);
+  line-height: 1.7;
+  text-wrap: balance;
+  animation: riseIn 620ms 140ms ease-out both;
+}
+
+.workspace {
+  position: relative;
+  z-index: 3;
+  width: min(100%, 56rem);
+  margin: clamp(2.3rem, 5vw, 3.7rem) auto 0;
+  padding: 0.85rem;
+  background: rgb(255 255 255 / 94%);
+  border: 1px solid rgb(94 56 141 / 16%);
+  border-radius: 1.65rem;
+  box-shadow: 0 1.4rem 4rem rgb(61 39 87 / 12%);
+  animation: riseIn 680ms 210ms ease-out both;
+}
+
+.routeLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.15rem 0.45rem 0.75rem;
+  color: #766d7d;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.routeArrow {
+  display: inline-grid;
+  flex: 0 0 1rem;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  color: var(--circuit-violet);
+}
+
+.routeArrow svg {
+  display: block;
+  width: 0.8rem;
+  height: 0.8rem;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+@keyframes riseIn {
+  from {
+    transform: translateY(1rem);
+  }
+}
+
+@keyframes phraseCompression {
+  0%,
+  76%,
+  100% {
+    transform: scaleX(1);
+  }
+
+  85%,
+  88% {
+    transform: scaleX(0.78);
+  }
+}
+
+@media (max-width: 40rem) {
+  .hero {
+    min-height: auto;
+    padding: 3.2rem 1rem 3.5rem;
+  }
+
+  .title {
+    font-size: clamp(3.15rem, 16vw, 4.7rem);
+    line-height: 0.9;
+  }
+
+  .description {
+    margin-top: 1.15rem;
+    font-size: 0.96rem;
+  }
+
+  .workspace {
+    margin-top: 2rem;
+    padding: 0.65rem;
+    border-radius: 1.35rem;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title,
+  .description,
+  .workspace,
+  .titleLine {
+    animation: none;
+  }
+}

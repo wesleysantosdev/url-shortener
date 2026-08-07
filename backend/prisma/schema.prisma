@@ -1,0 +1,19 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider     = "prisma-client"
+  output       = "./generated"
+  moduleFormat = "cjs"
+}
+
+model Url {
+  id             BigInt   @id @default(autoincrement())
+  originalUrl    String   @db.VarChar(2048)
+  createdAt      DateTime @default(now())
+  clicks         Int      @default(0)
+  lastAccessedAt DateTime @default(now())
+
+  @@index([lastAccessedAt])
+}

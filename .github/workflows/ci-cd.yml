@@ -1,0 +1,124 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate application
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Validate backend
+        working-directory: backend
+        run: |
+          npm ci
+          npm test
+          npm run typecheck
+          npm run build
+
+      - name: Validate frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run build
+
+  deploy:
+    name: Deploy production
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: shrten-production
+      cancel-in-progress: false
+
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      SSH_KEY_FILE: /home/runner/.ssh/shrten_deploy
+
+    steps:
+      - name: Check out approved commit
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          install -m 600 /dev/null "$SSH_KEY_FILE"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$SSH_KEY_FILE"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 644 "$HOME/.ssh/known_hosts"
+
+      - name: Verify SSH access
+        run: |
+          ssh -i "$SSH_KEY_FILE" -o IdentitiesOnly=yes \
+            "$VPS_USER@$VPS_HOST" true
+
+      - name: Back up production database
+        run: |
+          ssh -i "$SSH_KEY_FILE" -o IdentitiesOnly=yes \
+            "$VPS_USER@$VPS_HOST" \
+            'if [ -x /opt/apps/shrten/ops/backup-postgres.sh ]; then /opt/apps/shrten/ops/backup-postgres.sh; fi'
+
+      - name: Upload approved commit
+        run: |
+          rsync -az --delete \
+            --include='.env.production.example' \
+            --include='*/.env.example' \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='dist/' \
+            --exclude='coverage/' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='*.log' \
+            -e "ssh -i $SSH_KEY_FILE -o IdentitiesOnly=yes" \
+            ./ "$VPS_USER@$VPS_HOST:/opt/apps/shrten/"
+
+      - name: Build and deploy containers
+        run: |
+          ssh -i "$SSH_KEY_FILE" -o IdentitiesOnly=yes \
+            "$VPS_USER@$VPS_HOST" \
+            'cd /opt/apps/shrten && ./ops/deploy.sh'
+
+      - name: Record deployed revision
+        env:
+          DEPLOY_REVISION: ${{ github.sha }}
+        run: |
+          ssh -i "$SSH_KEY_FILE" -o IdentitiesOnly=yes \
+            "$VPS_USER@$VPS_HOST" \
+            "printf '%s\n' '$DEPLOY_REVISION' > /opt/apps/shrten/REVISION"
+
+      - name: Verify public endpoint
+        run: |
+          curl --fail --silent --show-error \
+            --retry 12 --retry-delay 5 --retry-all-errors \
+            https://shrten.pro/ > /dev/null

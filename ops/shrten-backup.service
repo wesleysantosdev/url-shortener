@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up the shrten.pro PostgreSQL database
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+Environment=SHRTEN_APP_DIR=/opt/apps/shrten
+Environment=SHRTEN_BACKUP_DIR=/opt/backups/shrten
+ExecStart=/opt/apps/shrten/ops/backup-postgres.sh
+
+[Install]
+WantedBy=multi-user.target

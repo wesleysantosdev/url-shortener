@@ -1,0 +1,8 @@
+# Local development specifications
+specs/
+
+# Environment files may contain production credentials.
+.env
+.env.*
+!.env.example
+!.env.production.example
