@@ -80,16 +80,14 @@ describe('production deployment', () => {
     expect(caddyfile).toContain('try_files {path} /index.html')
   })
 
-  it('documents production values without tracking their secret file', () => {
-    const environmentExample = repositoryFile('.env.production.example')
+  it('keeps local production notes and the environment template untracked', () => {
     const gitignore = repositoryFile('.gitignore')
+    const workflow = repositoryFile('.github/workflows/ci-cd.yml')
 
-    expect(environmentExample).toContain('PRIMARY_DOMAIN=shrten.pro')
-    expect(environmentExample).toContain('POSTGRES_PASSWORD=')
-    expect(environmentExample).toContain('REDIS_PASSWORD=')
-    expect(environmentExample).toContain('RATE_LIMIT_IP_HASH_SECRET=')
-    expect(environmentExample).toContain('SHORT_CODE_SECRET=')
-    expect(gitignore).toContain('!.env.production.example')
+    expect(gitignore).toMatch(/^\.env\.production\.example$/m)
+    expect(gitignore).toMatch(/^DEPLOYMENT\.md$/m)
+    expect(gitignore).not.toContain('!.env.production.example')
+    expect(workflow).not.toContain("--include='.env.production.example'")
   })
 
   it('provides a restorable scheduled PostgreSQL backup', () => {
